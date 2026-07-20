@@ -48,9 +48,18 @@ public final class MenuClock {
             );
         });
 
-        // UseItemCallback 会为主手和副手各触发一次；主手返回 SUCCESS 后原版仍
-        // 会继续跑副手，导致"主手空 + 副手拿方块"时会把方块放在脚下。
-        // 解决办法：主手是菜单时钟时，主手打开菜单并 fail 掉副手事件；副手是菜单时钟时保持原样。
+        // UseItemCallback 会为主手和副手各触发一次；无论菜单时钟在哪只手，
+        // 都要打开菜单一次，另一只手当次的物品使用也要一起吃掉。
+        //
+        // 分支矩阵（M=主手事件, O=副手事件, ✓=菜单时钟, ✗=非时钟）：
+        //   触发手  另一手  行为
+        //   M ✓    O 任意   打开菜单 + fail（同时短路后续副手事件）
+        //   M ✗    O ✓     pass（让主手正常交互，菜单交给副手事件处理）
+        //   M ✗    O ✗     pass
+        //   O ✓    M 任意*  打开菜单 + fail
+        //   O ✗    M ✓     fail（M 已开过菜单，副手事件必须吃掉方块使用）
+        //   * "主手也是菜单时钟"时 M 事件已经开过菜单了，O 事件跑到这里再开一次
+        //     不合适——用 lastOpenTick 去重，同 tick 已开则只 fail 不再开。
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
             if (!(player instanceof ServerPlayerEntity serverPlayer)) {
@@ -61,25 +70,35 @@ public final class MenuClock {
             ItemStack offHand = player.getOffHandStack();
             boolean mainIsClock = isMenuClock(mainHand);
             boolean offIsClock = isMenuClock(offHand);
+            boolean thisHandIsClock = hand == Hand.MAIN_HAND ? mainIsClock : offIsClock;
 
-            if (hand == Hand.MAIN_HAND) {
-                if (!mainIsClock) return TypedActionResult.pass(mainHand);
-                MenuUi.open(serverPlayer);
-                // fail 而不是 success：阻止 swing 动画 + 副手的物品使用
-                return TypedActionResult.fail(mainHand);
+            if (thisHandIsClock) {
+                openOnce(serverPlayer);
+                return TypedActionResult.fail(player.getStackInHand(hand));
             }
 
-            // hand == OFF_HAND
-            if (mainIsClock) {
-                // 主手已经处理过菜单，副手事件必须吃掉，否则副手方块会被放置
-                return TypedActionResult.fail(offHand);
+            // 当前手不是时钟；如果另一手是时钟，本次事件也要吃掉，防止方块放置
+            boolean otherHandIsClock = hand == Hand.MAIN_HAND ? offIsClock : mainIsClock;
+            if (otherHandIsClock) {
+                return TypedActionResult.fail(player.getStackInHand(hand));
             }
-            if (offIsClock) {
-                // 主手拿其它物品，玩家显然想用主手交互，副手时钟不参与
-                return TypedActionResult.pass(offHand);
-            }
-            return TypedActionResult.pass(offHand);
+            return TypedActionResult.pass(player.getStackInHand(hand));
         });
+    }
+
+    /**
+     * 同一玩家在同一 tick 内多次触发（主手 + 副手都点了菜单时钟，或
+     * 主手时钟 + 副手时钟共存）只开一次菜单。
+     */
+    private static final java.util.WeakHashMap<ServerPlayerEntity, Long> LAST_OPEN_TICK =
+        new java.util.WeakHashMap<>();
+
+    private static void openOnce(ServerPlayerEntity player) {
+        long tick = player.getServer().getTicks();
+        Long prev = LAST_OPEN_TICK.get(player);
+        if (prev != null && prev == tick) return;
+        LAST_OPEN_TICK.put(player, tick);
+        MenuUi.open(player);
     }
 
     public static boolean isMenuClock(ItemStack stack) {
