@@ -28,6 +28,7 @@ public class StarterKitMod implements ModInitializer {
         FlyCommand.register();
         EntityCaptureHandler.register();
         CarpetPermission.register();
+        KillPermission.register();
         MenuClock.register();
         LandmarkCommand.register();
 
