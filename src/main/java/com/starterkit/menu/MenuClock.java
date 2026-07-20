@@ -60,29 +60,35 @@ public final class MenuClock {
         //   O ✗    M ✓     fail（M 已开过菜单，副手事件必须吃掉方块使用）
         //   * "主手也是菜单时钟"时 M 事件已经开过菜单了，O 事件跑到这里再开一次
         //     不合适——用 lastOpenTick 去重，同 tick 已开则只 fail 不再开。
+        // vanilla 派发右键的顺序是：主手事件 → 若 pass 才尝试副手。
+        // 因此我们必须在**主手事件**里就检测"任一手是不是菜单时钟"：
+        //   任一手是时钟 → 立即打开菜单 + fail 掉主手，vanilla 就不会派发副手
+        //     事件，也就不会放副手方块。
+        //   都不是时钟 → pass。
+        // 副手事件正常跑不到，仅作为 defensive path 保留。
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
             if (!(player instanceof ServerPlayerEntity serverPlayer)) {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
 
-            ItemStack mainHand = player.getMainHandStack();
-            ItemStack offHand = player.getOffHandStack();
-            boolean mainIsClock = isMenuClock(mainHand);
-            boolean offIsClock = isMenuClock(offHand);
-            boolean thisHandIsClock = hand == Hand.MAIN_HAND ? mainIsClock : offIsClock;
+            boolean mainIsClock = isMenuClock(player.getMainHandStack());
+            boolean offIsClock = isMenuClock(player.getOffHandStack());
 
-            if (thisHandIsClock) {
+            if (hand == Hand.MAIN_HAND) {
+                if (mainIsClock || offIsClock) {
+                    openOnce(serverPlayer);
+                    return TypedActionResult.fail(player.getMainHandStack());
+                }
+                return TypedActionResult.pass(player.getMainHandStack());
+            }
+
+            // hand == OFF_HAND（防御性路径）
+            if (offIsClock) {
                 openOnce(serverPlayer);
-                return TypedActionResult.fail(player.getStackInHand(hand));
+                return TypedActionResult.fail(player.getOffHandStack());
             }
-
-            // 当前手不是时钟；如果另一手是时钟，本次事件也要吃掉，防止方块放置
-            boolean otherHandIsClock = hand == Hand.MAIN_HAND ? offIsClock : mainIsClock;
-            if (otherHandIsClock) {
-                return TypedActionResult.fail(player.getStackInHand(hand));
-            }
-            return TypedActionResult.pass(player.getStackInHand(hand));
+            return TypedActionResult.pass(player.getOffHandStack());
         });
     }
 
