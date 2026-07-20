@@ -2,6 +2,7 @@ package com.starterkit;
 
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.LeavesBlock;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.ItemStack;
@@ -13,37 +14,53 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
- * 树木连锁采集：玩家用斧头砍下一块 log 时，若开关开启，则以该 log 为起点做 BFS
- * 扩散，把相连的 log/wood 一并破坏，同时正常掉落物 + 扣工具耐久 + 消耗玩家饥饿。
+ * 树木连锁采集：玩家用斧头砍一块 log 时，先判断这块 log 是否属于一棵**自然树**，
+ * 若是则把整棵树的所有 log 一起破坏。
  *
- *   - 触发：主手斧头，起始方块属于 BlockTags.LOGS。
- *   - 邻居：26 邻域（含斜向），处理弯曲/歪脖子树。
- *   - 上限：128 块，超过就停，避免玩家用铁斧一斧头拆整片森林。
- *   - 耐久：每砍一块扣 1 点；耐久 <= 0 时停止（贴合原版'工具坏了就停'的直觉）。
- *   - 事件挂 AFTER：起始块已被原版事件破坏，我们只处理"扩散那些"。
+ *   - 判定"自然树"：以起始 log 为中心 BFS 收集所有相连的 log；对这批 log
+ *     的 6 邻居检查——是否存在至少一片 `LeavesBlock` 且 `PERSISTENT=false`。
+ *     PERSISTENT=false 只出现于世界生成/树苗长大时的天然叶子；玩家用剪刀
+ *     采集后放置的叶子 PERSISTENT=true。这样能干净地区分"天然森林"和
+ *     "玩家自建的木屋墙壁"。
+ *   - 触发：主手斧头，起始方块属于 BlockTags.LOGS，非创造/观察者。
+ *   - 邻居：26 邻域用于连通性；判定叶子只看 6 邻居，避免误判斜下方的其它
+ *     树的叶子。
+ *   - 上限：128 块（安全阀，正常巨型丛林树也就 100+）。
+ *   - 耐久：每砍一块扣 1 点；耐久归零立即停。
+ *   - 事件挂 AFTER：起始块已被原版事件破坏。若判定为树，破坏剩下的连通 log。
  */
 public final class VeinMineHandler {
 
     private static final int MAX_BLOCKS = 128;
-    /** 27 邻居的 offset（0,0,0 会被 visited 集自然过滤掉）*/
-    private static final int[][] NEIGHBOR_OFFSETS;
+
+    /** 26 邻居 offset（含斜向），用于扫连通的 log。*/
+    private static final int[][] NEIGHBOR_26;
+    /** 6 邻居 offset（上下前后左右），用于判"旁边有没有叶子"。*/
+    private static final int[][] NEIGHBOR_6 = {
+        {1, 0, 0}, {-1, 0, 0},
+        {0, 1, 0}, {0, -1, 0},
+        {0, 0, 1}, {0, 0, -1},
+    };
+
     static {
-        NEIGHBOR_OFFSETS = new int[26][];
+        NEIGHBOR_26 = new int[26][];
         int i = 0;
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dy == 0 && dz == 0) continue;
-                    NEIGHBOR_OFFSETS[i++] = new int[]{dx, dy, dz};
+                    NEIGHBOR_26[i++] = new int[]{dx, dy, dz};
                 }
     }
 
-    /** 防止递归：玩家开始一次 veinmine 处理时进这个集合，处理完再移除。*/
+    /** 防止 breakBlock 触发的 AFTER 再次进这里造成递归。*/
     private static final Set<java.util.UUID> IN_PROGRESS = new HashSet<>();
 
     private VeinMineHandler() {}
@@ -57,7 +74,7 @@ public final class VeinMineHandler {
         if (world.isClient) return;
         if (!(world instanceof ServerWorld sw)) return;
         if (!(player instanceof ServerPlayerEntity sp)) return;
-        if (sp.isCreative() || sp.isSpectator()) return; // 创造模式直接破坏，不搞连锁
+        if (sp.isCreative() || sp.isSpectator()) return;
         if (!VeinMineTracker.isEnabled(sp.getUuid())) return;
         if (IN_PROGRESS.contains(sp.getUuid())) return;
 
@@ -67,41 +84,68 @@ public final class VeinMineHandler {
 
         IN_PROGRESS.add(sp.getUuid());
         try {
-            veinBreak(sw, sp, tool, pos);
+            List<BlockPos> logs = collectConnectedLogs(sw, pos);
+            if (!isTree(sw, logs)) return; // 不是树，什么都不做
+            breakAll(sw, sp, tool, logs);
         } finally {
             IN_PROGRESS.remove(sp.getUuid());
         }
     }
 
-    private static void veinBreak(ServerWorld world, ServerPlayerEntity player,
-                                  ItemStack tool, BlockPos origin) {
+    /**
+     * BFS 收集连通的 log。不包含起始块（起始块已被原版事件破坏）。
+     * 硬上限 MAX_BLOCKS 防止一斧头扫掉巨型森林。
+     */
+    private static List<BlockPos> collectConnectedLogs(ServerWorld world, BlockPos origin) {
+        List<BlockPos> result = new ArrayList<>();
         Set<BlockPos> visited = new HashSet<>();
-        visited.add(origin);
+        visited.add(origin.toImmutable());
         Deque<BlockPos> queue = new ArrayDeque<>();
         queue.add(origin);
 
-        int broken = 0;
-        while (!queue.isEmpty() && broken < MAX_BLOCKS) {
+        while (!queue.isEmpty() && result.size() < MAX_BLOCKS) {
             BlockPos current = queue.poll();
-            for (int[] off : NEIGHBOR_OFFSETS) {
+            for (int[] off : NEIGHBOR_26) {
                 BlockPos next = current.add(off[0], off[1], off[2]);
-                if (!visited.add(next)) continue;
+                if (!visited.add(next.toImmutable())) continue;
                 BlockState ns = world.getBlockState(next);
                 if (!ns.isIn(BlockTags.LOGS)) continue;
-
-                // breakBlock 会掉落物品（走 vanilla 掉落逻辑 + 工具属性判定）
-                world.breakBlock(next, true, player);
-                broken++;
-
-                // 扣一点耐久；坏了停手
-                if (tool.getMaxDamage() > 0) {
-                    tool.damage(1, player,
-                        p -> p.sendToolBreakStatus(Hand.MAIN_HAND));
-                    if (tool.isEmpty()) return;
-                }
-
+                result.add(next.toImmutable());
                 queue.add(next);
-                if (broken >= MAX_BLOCKS) return;
+                if (result.size() >= MAX_BLOCKS) break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 判定"这团 log 是否属于一棵自然树"：
+     *   6 邻居内存在至少一片叶子 且 PERSISTENT == false。
+     *
+     * PERSISTENT=false → 世界生成或从树苗长大的天然叶子；
+     * PERSISTENT=true  → 玩家用剪刀采回放置的叶子。
+     * 玩家自建的木屋墙壁上方即使有叶子，也几乎都是 PERSISTENT=true 的。
+     */
+    private static boolean isTree(ServerWorld world, List<BlockPos> logs) {
+        for (BlockPos log : logs) {
+            for (int[] off : NEIGHBOR_6) {
+                BlockPos leafPos = log.add(off[0], off[1], off[2]);
+                BlockState s = world.getBlockState(leafPos);
+                if (!(s.getBlock() instanceof LeavesBlock)) continue;
+                if (!s.get(LeavesBlock.PERSISTENT)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** 逐块 breakBlock，走 vanilla 掉落逻辑，同时扣工具耐久，坏了停手。*/
+    private static void breakAll(ServerWorld world, ServerPlayerEntity player,
+                                 ItemStack tool, List<BlockPos> logs) {
+        for (BlockPos p : logs) {
+            world.breakBlock(p, true, player);
+            if (tool.getMaxDamage() > 0) {
+                tool.damage(1, player, pl -> pl.sendToolBreakStatus(Hand.MAIN_HAND));
+                if (tool.isEmpty()) return;
             }
         }
     }
