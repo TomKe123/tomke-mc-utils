@@ -1,14 +1,12 @@
 package com.starterkit.menu;
 
+import com.starterkit.FlyCommand;
 import com.starterkit.KitCommand;
 import com.starterkit.KitTracker;
-// PlayerListMenu / LandmarkMenu 同包，无需 import
+import com.starterkit.landmark.LandmarkStore;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -24,18 +22,26 @@ import java.util.function.Consumer;
 /**
  * 主菜单构造与打开入口。
  *
- * 布局（9x3，槽位下标 0..26）：
+ * 布局 9x3：
  *
- *   .  .  .  .  .  .  .  .  .        (row 0：装饰或留空)
- *   .  10 .  12 .  14 .  16 .        (row 1：功能按钮)
- *   .  .  .  .  .  .  .  .  .        (row 2：装饰或留空)
+ *   槽位:  0  1  2  3  4  5  6  7  8
+ *          ■  ■  ■  ■  ✧  ■  ■  ■  ■     row 0  4=玩家信息卡
+ *          ■  ■ 11  ■ 13  ■ 15  ■  ■     row 1  11/13/15=功能按钮
+ *          ■  ■  ■  ■ 22  ■  ■  ■ 26     row 2  22=次要功能  26=关闭
  *
- * 10 = 出生点(床)  12 = 飞行(羽毛)  14 = 领取Kit(木盒)  16 = 玩家列表(玩家头颅)
- * 后续加地标时用 20 或 22。
+ * 按钮:
+ *   11 - 出生点(床)
+ *   13 - 飞行切换(羽毛, 开启时发光)
+ *   15 - 领取 Kit (箱子)
+ *   22 - 玩家列表(玩家头颅) - 中央下方
+ *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
+ *   26 - 关闭(屏障)
+ *
+ * 空槽全部用灰色玻璃板铺满，避免"透视格"感。
+ * 地标暂时挪到玩家信息卡下方的第 2 行剩余槽（20/24）
+ * ——地标信息在标题栏没位置就先扔进主菜单第二排的 20 槽。
  */
 public final class MenuUi {
-
-    private static final Text TITLE = Text.literal("§b主菜单");
 
     private MenuUi() {}
 
@@ -43,35 +49,122 @@ public final class MenuUi {
         Inventory inv = MenuScreenHandler.buildInventory(3);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
-        // 出生点
-        inv.setStack(10, button(Items.RED_BED, "§f返回出生点",
-            List.of("§7点击传送回你的重生点。", "§7未设置重生点则前往世界出生点。")));
-        actions.put(10, MenuUi::tpSpawn);
+        // 顶部中央：玩家信息卡（不响应点击，仅展示）
+        inv.setStack(4, playerInfoCard(player));
 
-        // 飞行
-        inv.setStack(12, button(Items.FEATHER, "§f切换飞行",
-            List.of("§7开启/关闭 /fly。", "§7飞行会消耗经验。")));
-        actions.put(12, MenuUi::toggleFly);
+        // 中央行：3 个主要功能
+        inv.setStack(11, spawnButton(player));
+        actions.put(11, MenuUi::tpSpawn);
 
-        // 领取 Kit（菜单入口无次数限制）
-        inv.setStack(14, button(Items.CHEST, "§f领取新手 Kit",
-            List.of("§7领取一套新手装备。", "§8可反复领取")));
-        actions.put(14, MenuUi::giveKit);
+        inv.setStack(13, flyButton(player));
+        actions.put(13, MenuUi::toggleFly);
 
-        // 玩家列表
-        inv.setStack(16, button(Items.PLAYER_HEAD, "§f玩家列表",
-            List.of("§7查看在线玩家。", "§7点击玩家头颅传送到其位置。")));
-        actions.put(16, PlayerListMenu::open);
+        inv.setStack(15, kitButton(player));
+        actions.put(15, MenuUi::giveKit);
 
-        // 地标
-        inv.setStack(22, button(Items.MAP, "§f服务器地标",
-            List.of("§7查看所有地标。", "§7添加请用 §f/landmark add <名字>")));
-        actions.put(22, LandmarkMenu::open);
+        // 底部导航
+        inv.setStack(20, landmarkButton());
+        actions.put(20, LandmarkMenu::open);
 
+        inv.setStack(22, playerListButton(player));
+        actions.put(22, PlayerListMenu::open);
+
+        inv.setStack(26, MenuButtons.closeButton());
+        actions.put(26, ServerPlayerEntity::closeHandledScreen);
+
+        // 剩下的空位铺满玻璃板
+        MenuButtons.fillBackground(inv);
+
+        // 标题带玩家名
+        Text title = Text.literal("§b§l§n" + player.getGameProfile().getName() + " 的菜单");
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
             (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions),
-            TITLE
+            title
         ));
+    }
+
+    // ------------------------------------------------------------------ buttons
+
+    private static ItemStack playerInfoCard(ServerPlayerEntity player) {
+        BlockPos pos = player.getBlockPos();
+        String dim = dimShort(player.getWorld().getRegistryKey().getValue().toString());
+        List<String> lore = List.of(
+            "§7等级 §f" + player.experienceLevel + " §8· §7经验 §f" + player.totalExperience,
+            "§7生命 §c" + (int) Math.ceil(player.getHealth()) + "§7/§c" + (int) Math.ceil(player.getMaxHealth()),
+            "§7位置 §f" + pos.getX() + " " + pos.getY() + " " + pos.getZ() + " §7@ §f" + dim,
+            "",
+            "§8点击其他槽位使用菜单"
+        );
+        return MenuButtons.skull(player.getGameProfile(),
+            "§e§l" + player.getGameProfile().getName(), lore);
+    }
+
+    private static ItemStack spawnButton(ServerPlayerEntity player) {
+        BlockPos spawn = player.getSpawnPointPosition();
+        List<String> lore;
+        if (spawn != null) {
+            String dim = dimShort(player.getSpawnPointDimension().getValue().toString());
+            lore = List.of(
+                "§7重生点 §f" + spawn.getX() + " " + spawn.getY() + " " + spawn.getZ(),
+                "§7维度 §f" + dim,
+                "",
+                "§a▶ 点击传送"
+            );
+        } else {
+            lore = List.of(
+                "§7未设置重生点",
+                "§7将前往世界出生点",
+                "",
+                "§a▶ 点击传送"
+            );
+        }
+        return MenuButtons.button(Items.RED_BED, "§f§l返回出生点", lore);
+    }
+
+    private static ItemStack flyButton(ServerPlayerEntity player) {
+        boolean enabled = FlyCommand.isEnabled(player.getUuid());
+        String status = enabled ? "§a已开启" : "§c已关闭";
+        List<String> lore = List.of(
+            "§7当前 " + status,
+            "§7等级 §f" + player.experienceLevel + " §8(消耗经验飞行)",
+            "",
+            "§a▶ 点击切换"
+        );
+        ItemStack stack = MenuButtons.button(Items.FEATHER, "§f§l飞行开关", lore);
+        if (enabled) MenuButtons.withGlow(stack);
+        return stack;
+    }
+
+    private static ItemStack kitButton(ServerPlayerEntity player) {
+        boolean claimed = KitTracker.hasClaimed(player.getUuid());
+        List<String> lore = List.of(
+            claimed ? "§7首次领取 §a已完成" : "§7首次领取 §e未领取",
+            "§7菜单入口可反复领取",
+            "",
+            "§a▶ 点击领取一套"
+        );
+        return MenuButtons.button(Items.CHEST, "§f§l新手 Kit", lore);
+    }
+
+    private static ItemStack playerListButton(ServerPlayerEntity player) {
+        int online = player.getServer().getPlayerManager().getPlayerList().size();
+        List<String> lore = List.of(
+            "§7在线人数 §f" + online,
+            "",
+            "§a▶ 点击浏览并传送"
+        );
+        return MenuButtons.button(Items.PLAYER_HEAD, "§f§l在线玩家", lore);
+    }
+
+    private static ItemStack landmarkButton() {
+        int count = LandmarkStore.all().size();
+        List<String> lore = List.of(
+            "§7地标总数 §f" + count,
+            "§8/landmark add <名字>",
+            "",
+            "§a▶ 点击浏览并传送"
+        );
+        return MenuButtons.button(Items.MAP, "§f§l服务器地标", lore);
     }
 
     // ------------------------------------------------------------------ actions
@@ -88,19 +181,17 @@ public final class MenuUi {
         }
         float yaw = player.getSpawnAngle();
         player.teleport(target, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5, yaw, 0);
+        player.sendMessage(Text.literal("已传送到出生点").formatted(Formatting.GREEN), true);
         player.closeHandledScreen();
     }
 
     private static void toggleFly(ServerPlayerEntity player) {
-        // 复用 /fly 的实现：以玩家自己的身份执行，权限 0，行为跟手动敲 /fly 一致
         player.getServer().getCommandManager().executeWithPrefix(
             player.getCommandSource(), "fly");
         player.closeHandledScreen();
     }
 
     private static void giveKit(ServerPlayerEntity player) {
-        // 菜单入口：允许反复领取。同时把 KitTracker 标记补上，
-        // 保证下次登录不再被弹出"点击领取 Kit"的欢迎消息。
         KitCommand.giveKitItems(player);
         if (!KitTracker.hasClaimed(player.getUuid())) {
             KitTracker.markClaimed(player.getUuid());
@@ -111,19 +202,10 @@ public final class MenuUi {
 
     // ------------------------------------------------------------------ helpers
 
-    private static ItemStack button(net.minecraft.item.Item item, String name, List<String> loreLines) {
-        ItemStack stack = new ItemStack(item);
-        stack.setCustomName(Text.literal(name).styled(s -> s.withItalic(false)));
-
-        NbtCompound tag = stack.getOrCreateNbt();
-        NbtCompound display = tag.getCompound("display");
-        NbtList lore = new NbtList();
-        for (String line : loreLines) {
-            lore.add(NbtString.of(Text.Serializer.toJson(
-                Text.literal(line).styled(s -> s.withItalic(false)))));
-        }
-        display.put("Lore", lore);
-        tag.put("display", display);
-        return stack;
+    static String dimShort(String key) {
+        if ("minecraft:overworld".equals(key)) return "主世界";
+        if ("minecraft:the_nether".equals(key)) return "下界";
+        if ("minecraft:the_end".equals(key)) return "末地";
+        return key;
     }
 }

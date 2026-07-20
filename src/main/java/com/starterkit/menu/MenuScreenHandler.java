@@ -9,6 +9,8 @@ import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 
 import java.util.Map;
 import java.util.function.Consumer;
@@ -39,6 +41,11 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
         Consumer<ServerPlayerEntity> action = actions.get(slotIndex);
         if (action == null) return;
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
+
+        // 命中一个真正有 action 的槽位才播放音效，装饰玻璃板不响
+        serverPlayer.playSound(
+            SoundEvents.UI_BUTTON_CLICK.value(),
+            SoundCategory.MASTER, 0.5f, 1.0f);
         action.accept(serverPlayer);
     }
 

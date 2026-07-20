@@ -36,6 +36,11 @@ public final class FlyCommand {
 
     private FlyCommand() {}
 
+    /** 供菜单查询：玩家当前是否处于飞行启用状态。*/
+    public static boolean isEnabled(UUID uuid) {
+        return XP_DEBT.containsKey(uuid);
+    }
+
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(

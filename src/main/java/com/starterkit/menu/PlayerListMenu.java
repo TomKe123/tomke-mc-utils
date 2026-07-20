@@ -3,10 +3,6 @@ package com.starterkit.menu;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtHelper;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -14,28 +10,33 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 玩家列表子菜单：显示在线玩家（自己除外）的玩家头颅，点击 tp 过去。
+ * 玩家列表子菜单。9x3 布局：
  *
- * 布局（9x3）：
- *   前 21 格 = 玩家槽位（0..20）
- *   槽 26 = 返回主菜单
- *   若一页放不下，槽 24 = 上一页 / 槽 25 = 下一页
+ *   row 0: 顶部 header 装饰（亮色玻璃板 + 中央标题头颅）
+ *   row 1: 前 9 个玩家（槽 9..17）
+ *   row 2: [◀ prev] . . . [返回] . . . [next ▶]  底部导航
+ *           18                22               26
  *
- * 玩家头颅通过 SkullOwner NBT 显示对应玩家皮肤（客户端会异步向 Mojang 请求皮肤）。
+ * 每页最多 9 个玩家（槽 9-17）——比之前的 21 少，但配合按距离排序，
+ * 一屏能看到"离我最近的 9 个"就够用。翻页更容易的话，找远处玩家也不难。
+ *
+ * 排序规则：同维度的按跟观察者的距离升序，跨维度的排在最后（无距离数值）。
  */
 public final class PlayerListMenu {
 
-    private static final int PAGE_SIZE = 21;
+    private static final int PAGE_SIZE = 9;
+    private static final int FIRST_SLOT = 9;
     private static final int PREV_SLOT = 18;
-    private static final int NEXT_SLOT = 26;
     private static final int BACK_SLOT = 22;
-    private static final Text TITLE = Text.literal("§b在线玩家");
+    private static final int NEXT_SLOT = 26;
+    private static final Text TITLE = Text.literal("§b§l§n在线玩家");
 
     private PlayerListMenu() {}
 
@@ -48,6 +49,10 @@ public final class PlayerListMenu {
         for (ServerPlayerEntity p : viewer.getServer().getPlayerManager().getPlayerList()) {
             if (!p.getUuid().equals(viewer.getUuid())) others.add(p);
         }
+        // 排序：同维度按距离升序，跨维度放最后
+        others.sort(Comparator
+            .<ServerPlayerEntity, Integer>comparing(p -> sameDimension(viewer, p) ? 0 : 1)
+            .thenComparingDouble(p -> sameDimension(viewer, p) ? p.squaredDistanceTo(viewer) : 0));
 
         int totalPages = Math.max(1, (others.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(0, Math.min(page, totalPages - 1));
@@ -55,29 +60,40 @@ public final class PlayerListMenu {
         Inventory inv = MenuScreenHandler.buildInventory(3);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
+        // header 中央显示总人数
+        inv.setStack(4, MenuButtons.button(Items.COMPASS,
+            "§b§l在线玩家",
+            List.of("§7共 §f" + others.size() + " §7人",
+                "§7第 §f" + (page + 1) + " §7/ §f" + totalPages + " §7页")));
+
         int start = page * PAGE_SIZE;
         int end = Math.min(start + PAGE_SIZE, others.size());
         for (int i = start; i < end; i++) {
             ServerPlayerEntity target = others.get(i);
-            int slot = i - start;
-            inv.setStack(slot, playerHead(target));
+            int slot = FIRST_SLOT + (i - start);
+            inv.setStack(slot, playerHead(viewer, target));
             String targetName = target.getGameProfile().getName();
             actions.put(slot, viewerRef -> teleportTo(viewerRef, targetName));
         }
 
-        if (page > 0) {
-            inv.setStack(PREV_SLOT, arrow("§f← 上一页 (" + page + "/" + totalPages + ")"));
-            int prev = page - 1;
+        // 分页 & 返回
+        boolean hasPrev = page > 0;
+        boolean hasNext = page < totalPages - 1;
+        inv.setStack(PREV_SLOT, MenuButtons.pageButton(false, page, totalPages, hasPrev));
+        if (hasPrev) {
+            final int prev = page - 1;
             actions.put(PREV_SLOT, p -> open(p, prev));
         }
-        if (page < totalPages - 1) {
-            inv.setStack(NEXT_SLOT, arrow("§f下一页 → (" + (page + 2) + "/" + totalPages + ")"));
-            int next = page + 1;
+        inv.setStack(NEXT_SLOT, MenuButtons.pageButton(true, page, totalPages, hasNext));
+        if (hasNext) {
+            final int next = page + 1;
             actions.put(NEXT_SLOT, p -> open(p, next));
         }
 
-        inv.setStack(BACK_SLOT, backButton());
+        inv.setStack(BACK_SLOT, MenuButtons.backButton());
         actions.put(BACK_SLOT, MenuUi::open);
+
+        MenuButtons.fillBackground(inv);
 
         viewer.openHandledScreen(new SimpleNamedScreenHandlerFactory(
             (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions),
@@ -87,10 +103,6 @@ public final class PlayerListMenu {
 
     // ------------------------------------------------------------------ actions
 
-    /**
-     * 传送到指定玩家。查目标时用玩家管理器按名字取，
-     * 传送过程中断线或对方切世界都能安全兜底。
-     */
     private static void teleportTo(ServerPlayerEntity viewer, String targetName) {
         ServerPlayerEntity target = viewer.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
@@ -107,41 +119,27 @@ public final class PlayerListMenu {
 
     // ------------------------------------------------------------------ items
 
-    private static ItemStack playerHead(ServerPlayerEntity target) {
-        ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
-        NbtCompound nbt = stack.getOrCreateNbt();
-        // 使用 GameProfile 让客户端异步拉取皮肤
-        nbt.put("SkullOwner", NbtHelper.writeGameProfile(new NbtCompound(), target.getGameProfile()));
-
+    private static ItemStack playerHead(ServerPlayerEntity viewer, ServerPlayerEntity target) {
         String name = target.getGameProfile().getName();
-        stack.setCustomName(Text.literal(name)
-            .formatted(Formatting.YELLOW)
-            .styled(s -> s.withItalic(false)));
-
-        NbtCompound display = nbt.getCompound("display");
-        NbtList lore = new NbtList();
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("点击传送").formatted(Formatting.GRAY)
-                .styled(s -> s.withItalic(false)))));
-        // 附上世界信息
-        String dim = target.getWorld().getRegistryKey().getValue().toString();
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("§8" + dim)
-                .styled(s -> s.withItalic(false)))));
-        display.put("Lore", lore);
-        nbt.put("display", display);
-        return stack;
+        String dim = MenuUi.dimShort(target.getWorld().getRegistryKey().getValue().toString());
+        List<String> lore = new ArrayList<>();
+        if (sameDimension(viewer, target)) {
+            int distance = (int) Math.round(Math.sqrt(target.squaredDistanceTo(viewer)));
+            lore.add("§7距离 §f" + distance + " §7格");
+            lore.add("§7维度 §f" + dim);
+        } else {
+            lore.add("§7维度 §f" + dim + " §8(跨维度)");
+        }
+        lore.add("§7生命 §c" + (int) Math.ceil(target.getHealth())
+            + "§7/§c" + (int) Math.ceil(target.getMaxHealth())
+            + "  §7等级 §e" + target.experienceLevel);
+        lore.add("");
+        lore.add("§a▶ 点击传送");
+        return MenuButtons.skull(target.getGameProfile(),
+            "§e§l" + name, lore);
     }
 
-    private static ItemStack arrow(String name) {
-        ItemStack stack = new ItemStack(Items.ARROW);
-        stack.setCustomName(Text.literal(name).styled(s -> s.withItalic(false)));
-        return stack;
-    }
-
-    private static ItemStack backButton() {
-        ItemStack stack = new ItemStack(Items.BARRIER);
-        stack.setCustomName(Text.literal("§c返回主菜单").styled(s -> s.withItalic(false)));
-        return stack;
+    private static boolean sameDimension(ServerPlayerEntity a, ServerPlayerEntity b) {
+        return a.getWorld().getRegistryKey().equals(b.getWorld().getRegistryKey());
     }
 }
