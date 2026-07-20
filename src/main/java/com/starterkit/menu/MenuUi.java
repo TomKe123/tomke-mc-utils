@@ -26,20 +26,20 @@ import java.util.function.Consumer;
  *
  *   槽位:  0  1  2  3  4  5  6  7  8
  *          ■  ■  ■  ■  ✧  ■  ■  ■  ■     row 0  4=玩家信息卡
- *          ■  ■ 11  ■ 13  ■ 15  ■  ■     row 1  11/13/15=功能按钮
- *          ■  ■  ■  ■ 22  ■  ■  ■ 26     row 2  22=次要功能  26=关闭
+ *          ■  ■ 11  ■ 13  ■ 15  ■  ■     row 1  11/13/15=主功能
+ *          ■  ■ 20  ■ 22  ■ 24  ■ 26     row 2  20/22/24=次功能  26=关闭
  *
  * 按钮:
+ *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
  *   11 - 出生点(床)
  *   13 - 飞行切换(羽毛, 开启时发光)
  *   15 - 领取 Kit (箱子)
- *   22 - 玩家列表(玩家头颅) - 中央下方
- *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
+ *   20 - 服务器地标(地图)
+ *   22 - 在线玩家(头颅)
+ *   24 - 本包配方(工作台)
  *   26 - 关闭(屏障)
  *
  * 空槽全部用灰色玻璃板铺满，避免"透视格"感。
- * 地标暂时挪到玩家信息卡下方的第 2 行剩余槽（20/24）
- * ——地标信息在标题栏没位置就先扔进主菜单第二排的 20 槽。
  */
 public final class MenuUi {
 
@@ -68,6 +68,9 @@ public final class MenuUi {
 
         inv.setStack(22, playerListButton(player));
         actions.put(22, PlayerListMenu::open);
+
+        inv.setStack(24, recipeButton(player));
+        actions.put(24, RecipeMenu::open);
 
         inv.setStack(26, MenuButtons.closeButton());
         actions.put(26, ServerPlayerEntity::closeHandledScreen);
@@ -165,6 +168,20 @@ public final class MenuUi {
             "§a▶ 点击浏览并传送"
         );
         return MenuButtons.button(Items.MAP, "§f§l服务器地标", lore);
+    }
+
+    private static ItemStack recipeButton(ServerPlayerEntity player) {
+        int total = 0;
+        for (var r : player.getServer().getRecipeManager().values()) {
+            if (com.starterkit.StarterKitMod.MOD_ID.equals(r.getId().getNamespace())) total++;
+        }
+        List<String> lore = List.of(
+            "§7本包配方 §f" + total + " §7条",
+            "§7包含合成 / 切石",
+            "",
+            "§a▶ 点击查看"
+        );
+        return MenuButtons.button(Items.CRAFTING_TABLE, "§f§l本包配方", lore);
     }
 
     // ------------------------------------------------------------------ actions
