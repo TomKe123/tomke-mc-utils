@@ -31,6 +31,8 @@ public class StarterKitMod implements ModInitializer {
         KillPermission.register();
         MenuClock.register();
         LandmarkCommand.register();
+        Sidebar.register();
+        TabHealth.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             KitTracker.load(server);
