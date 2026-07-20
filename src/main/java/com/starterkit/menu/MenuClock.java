@@ -48,19 +48,37 @@ public final class MenuClock {
             );
         });
 
+        // UseItemCallback 会为主手和副手各触发一次；主手返回 SUCCESS 后原版仍
+        // 会继续跑副手，导致"主手空 + 副手拿方块"时会把方块放在脚下。
+        // 解决办法：主手是菜单时钟时，主手打开菜单并 fail 掉副手事件；副手是菜单时钟时保持原样。
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
             if (!(player instanceof ServerPlayerEntity serverPlayer)) {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
-            ItemStack stack = player.getStackInHand(hand);
-            if (!isMenuClock(stack)) return TypedActionResult.pass(stack);
 
-            // 只主手触发，避免副手空点也开
-            if (hand != Hand.MAIN_HAND) return TypedActionResult.pass(stack);
+            ItemStack mainHand = player.getMainHandStack();
+            ItemStack offHand = player.getOffHandStack();
+            boolean mainIsClock = isMenuClock(mainHand);
+            boolean offIsClock = isMenuClock(offHand);
 
-            MenuUi.open(serverPlayer);
-            return TypedActionResult.success(stack, false);
+            if (hand == Hand.MAIN_HAND) {
+                if (!mainIsClock) return TypedActionResult.pass(mainHand);
+                MenuUi.open(serverPlayer);
+                // fail 而不是 success：阻止 swing 动画 + 副手的物品使用
+                return TypedActionResult.fail(mainHand);
+            }
+
+            // hand == OFF_HAND
+            if (mainIsClock) {
+                // 主手已经处理过菜单，副手事件必须吃掉，否则副手方块会被放置
+                return TypedActionResult.fail(offHand);
+            }
+            if (offIsClock) {
+                // 主手拿其它物品，玩家显然想用主手交互，副手时钟不参与
+                return TypedActionResult.pass(offHand);
+            }
+            return TypedActionResult.pass(offHand);
         });
     }
 

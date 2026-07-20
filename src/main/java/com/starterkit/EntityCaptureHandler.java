@@ -37,14 +37,10 @@ public final class EntityCaptureHandler {
             if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
             if (entity instanceof PlayerEntity) return ActionResult.PASS;
 
-            // 只有双手都空才触发。UseEntityCallback 会以主手和副手分别触发一次，
-            // 我们只在主手事件里判断，副手事件直接跳过。
-            //   - 主手非空：走原版交互（右键喂食、给命名牌等）
-            //   - 副手非空：也走原版交互，避免"副手拿蓝宝石 + 主手空 shift+右键村民"
-            //     被误判为收纳；玩家想开交易时只需主手空、副手拿物品即可正常交易。
+            // 只有主手完全为空才触发。UseEntityCallback 会以主手和副手分别触发一次，
+            // 用副手时 hand == OFF_HAND 也直接跳过（原版副手交互会额外走一遍主手判定）。
             if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
             if (!player.getMainHandStack().isEmpty()) return ActionResult.PASS;
-            if (!player.getOffHandStack().isEmpty()) return ActionResult.PASS;
 
             SpawnEggItem egg = SpawnEggItem.forEntity(entity.getType());
             if (egg == null) return ActionResult.PASS;
