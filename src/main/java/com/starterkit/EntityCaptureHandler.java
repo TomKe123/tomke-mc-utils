@@ -5,6 +5,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SpawnEggItem;
+import net.minecraft.util.Hand;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
@@ -35,6 +36,11 @@ public final class EntityCaptureHandler {
             if (!player.isSneaking()) return ActionResult.PASS;
             if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
             if (entity instanceof PlayerEntity) return ActionResult.PASS;
+
+            // 只有主手完全为空才触发。UseEntityCallback 会以主手和副手分别触发一次，
+            // 用副手时 hand == OFF_HAND 也直接跳过（原版副手交互会额外走一遍主手判定）。
+            if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+            if (!player.getMainHandStack().isEmpty()) return ActionResult.PASS;
 
             SpawnEggItem egg = SpawnEggItem.forEntity(entity.getType());
             if (egg == null) return ActionResult.PASS;
