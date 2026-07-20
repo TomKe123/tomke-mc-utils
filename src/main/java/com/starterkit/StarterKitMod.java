@@ -29,6 +29,8 @@ public class StarterKitMod implements ModInitializer {
         EntityCaptureHandler.register();
         CarpetPermission.register();
         KillPermission.register();
+        VeinMineCommand.register();
+        VeinMineHandler.register();
         MenuClock.register();
         LandmarkCommand.register();
         Sidebar.register();
@@ -37,6 +39,7 @@ public class StarterKitMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             KitTracker.load(server);
             LandmarkStore.load(server);
+            VeinMineTracker.load(server);
             LOGGER.info("StarterKit loaded.");
         });
 
