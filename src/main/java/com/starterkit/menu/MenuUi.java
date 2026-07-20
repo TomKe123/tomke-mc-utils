@@ -27,18 +27,19 @@ import java.util.function.Consumer;
  *   槽位:  0  1  2  3  4  5  6  7  8
  *          ■  ■  ■  ■  ✧  ■  ■  ■  ■     row 0  4=玩家信息卡
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 1  装饰
- *          ■  ■ 20  ■ 22  ■ 24  ■  ■     row 2  20/22/24=主功能
+ *          ■ 10  ■ 12  ■ 14  ■ 16  ■     row 2  10/12/14/16=动作类
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 3  装饰
- *          ■  ■ 38  ■ 40  ■ 42  ■  ■     row 4  38/40/42=次功能
+ *          ■  ■ 38  ■ 40  ■ 42  ■  ■     row 4  38/40/42=开关/浏览类
  *          ■  ■  ■  ■  ■  ■  ■  ■ 53     row 5  53=关闭
  *
  * 按钮:
  *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
- *   20 - 出生点(床)
- *   22 - 飞行切换(羽毛, 开启时发光)
- *   24 - 领取 Kit (箱子)
- *   38 - 服务器地标(地图)
- *   40 - 在线玩家(头颅)
+ *   10 - 出生点(床)
+ *   12 - 领取 Kit (箱子)
+ *   14 - 在线玩家(头颅)
+ *   16 - 服务器地标(地图)
+ *   38 - 飞行切换(羽毛, 开启时发光)
+ *   40 - 树木连锁(木斧, 开启时发光)
  *   42 - 本包配方(工作台)
  *   53 - 关闭(屏障)
  *
@@ -55,22 +56,25 @@ public final class MenuUi {
         // 顶部中央：玩家信息卡（不响应点击，仅展示）
         inv.setStack(4, playerInfoCard(player));
 
-        // 主功能行 (row 2)
-        inv.setStack(20, spawnButton(player));
-        actions.put(20, MenuUi::tpSpawn);
+        // 动作行 (row 2)：4 个居中按钮
+        inv.setStack(10, spawnButton(player));
+        actions.put(10, MenuUi::tpSpawn);
 
-        inv.setStack(22, flyButton(player));
-        actions.put(22, MenuUi::toggleFly);
+        inv.setStack(12, kitButton(player));
+        actions.put(12, MenuUi::giveKit);
 
-        inv.setStack(24, kitButton(player));
-        actions.put(24, MenuUi::giveKit);
+        inv.setStack(14, playerListButton(player));
+        actions.put(14, PlayerListMenu::open);
 
-        // 次功能行 (row 4)
-        inv.setStack(38, landmarkButton());
-        actions.put(38, LandmarkMenu::open);
+        inv.setStack(16, landmarkButton());
+        actions.put(16, LandmarkMenu::open);
 
-        inv.setStack(40, playerListButton(player));
-        actions.put(40, PlayerListMenu::open);
+        // 开关/浏览行 (row 4)：3 个居中按钮
+        inv.setStack(38, flyButton(player));
+        actions.put(38, MenuUi::toggleFly);
+
+        inv.setStack(40, veinMineButton(player));
+        actions.put(40, MenuUi::toggleVeinMine);
 
         inv.setStack(42, recipeButton(player));
         actions.put(42, RecipeMenu::open);
@@ -188,6 +192,21 @@ public final class MenuUi {
         return MenuButtons.button(Items.CRAFTING_TABLE, "§f§l本包配方", lore);
     }
 
+    private static ItemStack veinMineButton(ServerPlayerEntity player) {
+        boolean enabled = com.starterkit.VeinMineTracker.isEnabled(player.getUuid());
+        String status = enabled ? "§a已开启" : "§c已关闭";
+        List<String> lore = List.of(
+            "§7当前 " + status,
+            "§7手持斧头砍树 §8→ §7连锁破坏原木",
+            "§8上限 128 块，消耗耐久",
+            "",
+            "§a▶ 点击切换"
+        );
+        ItemStack stack = MenuButtons.button(Items.WOODEN_AXE, "§f§l树木连锁采集", lore);
+        if (enabled) MenuButtons.withGlow(stack);
+        return stack;
+    }
+
     // ------------------------------------------------------------------ actions
 
     private static void tpSpawn(ServerPlayerEntity player) {
@@ -209,6 +228,15 @@ public final class MenuUi {
     private static void toggleFly(ServerPlayerEntity player) {
         player.getServer().getCommandManager().executeWithPrefix(
             player.getCommandSource(), "fly");
+        player.closeHandledScreen();
+    }
+
+    private static void toggleVeinMine(ServerPlayerEntity player) {
+        boolean now = com.starterkit.VeinMineTracker.toggle(player.getUuid());
+        player.sendMessage(now
+            ? Text.literal("树木连锁采集已 §a开启").formatted(Formatting.GREEN)
+            : Text.literal("树木连锁采集已 §c关闭").formatted(Formatting.YELLOW),
+            true);
         player.closeHandledScreen();
     }
 
