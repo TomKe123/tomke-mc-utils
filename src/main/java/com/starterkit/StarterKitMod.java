@@ -3,7 +3,6 @@ package com.starterkit;
 import com.starterkit.landmark.LandmarkCommand;
 import com.starterkit.landmark.LandmarkStore;
 import com.starterkit.menu.MenuClock;
-import com.starterkit.recipe.StarterKitRecipes;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -22,7 +21,6 @@ public class StarterKitMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        StarterKitRecipes.register();
         KitCommand.register();
         AntigravBootsHandler.register();
         TpPermission.register();

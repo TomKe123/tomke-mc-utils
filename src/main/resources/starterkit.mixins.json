@@ -3,6 +3,7 @@
   "package": "com.starterkit.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "CraftingResultMixin",
     "EntitySelectorPermissionMixin"
   ],
   "injectors": {
