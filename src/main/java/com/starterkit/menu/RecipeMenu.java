@@ -29,18 +29,18 @@ import java.util.function.Consumer;
  * "本包配方" 子菜单：展示 namespace = starterkit 的所有配方，
  * 分 crafting / stonecutting 两个 tab。仅展示，不发放物品。
  *
- * 布局 9x3：
- *   row 0: [tab 合成] [tab 切石] . . . . . . .
- *   row 1: 前 9 个配方（结果物品图标）
- *   row 2: [◀ prev] . . . [返回] . . . [next ▶]
+ * 布局 9x6：
+ *   row 0: [tab 合成 0] [tab 切石 1] . . . . . . .
+ *   row 1-4: 配方格 9-44 共 36 个
+ *   row 5: [◀ 45] . . . [返回 49] . . . [▶ 53]
  */
 public final class RecipeMenu {
 
-    private static final int PAGE_SIZE = 9;
+    private static final int PAGE_SIZE = 36;
     private static final int FIRST_SLOT = 9;
-    private static final int PREV_SLOT = 18;
-    private static final int BACK_SLOT = 22;
-    private static final int NEXT_SLOT = 26;
+    private static final int PREV_SLOT = 45;
+    private static final int BACK_SLOT = 49;
+    private static final int NEXT_SLOT = 53;
     private static final Text TITLE = Text.literal("§b§l§n本包配方");
 
     private enum Tab {
@@ -67,7 +67,7 @@ public final class RecipeMenu {
         int totalPages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(0, Math.min(page, totalPages - 1));
 
-        Inventory inv = MenuScreenHandler.buildInventory(3);
+        Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
         // tabs
@@ -80,7 +80,7 @@ public final class RecipeMenu {
 
         // 页内容
         if (list.isEmpty()) {
-            inv.setStack(13, MenuButtons.button(Items.PAPER, "§7暂无配方",
+            inv.setStack(22, MenuButtons.button(Items.PAPER, "§7暂无配方",
                 List.of("§8该类型没有本包配方")));
         } else {
             int start = page * PAGE_SIZE;

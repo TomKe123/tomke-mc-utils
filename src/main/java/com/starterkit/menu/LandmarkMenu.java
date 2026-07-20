@@ -18,22 +18,21 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 地标子菜单。9x3 布局：
+ * 地标子菜单。9x6 布局：
  *
- *   row 0: [◈ all] [◈ 主] [◈ 下] [◈ 末] [.] [.] [.] [.] [.]    维度筛选 tab
- *          0       1      2      3
- *   row 1: 前 9 个地标
- *   row 2: [◀ prev]  .  .  .  [返回]  .  .  .  [next ▶]
+ *   row 0: [◈ all] [◈ 主] [◈ 下] [◈ 末]  维度筛选 tab (槽 0-3)
+ *   row 1-4: 地标格 9-44 共 36 个
+ *   row 5: [◀ 45]  .  .  .  [返回 49]  .  .  .  [▶ 53]
  *
- * 顶部 tab 通过染色玻璃 + custom name 表现，选中的加发光光效。
+ * 选中 tab 加发光光效。
  */
 public final class LandmarkMenu {
 
-    private static final int PAGE_SIZE = 9;
+    private static final int PAGE_SIZE = 36;
     private static final int FIRST_SLOT = 9;
-    private static final int PREV_SLOT = 18;
-    private static final int BACK_SLOT = 22;
-    private static final int NEXT_SLOT = 26;
+    private static final int PREV_SLOT = 45;
+    private static final int BACK_SLOT = 49;
+    private static final int NEXT_SLOT = 53;
     private static final Text TITLE = Text.literal("§b§l§n服务器地标");
 
     private static final String FILTER_ALL = "";
@@ -55,7 +54,7 @@ public final class LandmarkMenu {
         int totalPages = Math.max(1, (filtered.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(0, Math.min(page, totalPages - 1));
 
-        Inventory inv = MenuScreenHandler.buildInventory(3);
+        Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
         // 维度 tab
@@ -77,7 +76,7 @@ public final class LandmarkMenu {
 
         // 页面内容
         if (filtered.isEmpty()) {
-            inv.setStack(13, MenuButtons.button(Items.PAPER, "§7暂无地标",
+            inv.setStack(22, MenuButtons.button(Items.PAPER, "§7暂无地标",
                 filter.isEmpty()
                     ? List.of("§8使用 §f/landmark add <名字> §8添加")
                     : List.of("§8该维度还没有地标",

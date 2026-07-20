@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 只读菜单容器。9x3 布局，玩家不能取走/放入/交换物品；
- * 只有 slot -> action 表里注册过的槽位在被点击时会触发对应动作。
- * 其他槽位（含玩家自己的背包区）点击均 no-op。
+ * 只读菜单容器。根据 inventory 大小自适应 9x3 / 9x6 布局，
+ * 玩家不能取走/放入/交换物品；只有 slot -> action 表里注册过的槽位
+ * 在被点击时会触发对应动作。其他槽位（含玩家自己的背包区）点击均 no-op。
  */
 public final class MenuScreenHandler extends GenericContainerScreenHandler {
 
@@ -29,9 +29,19 @@ public final class MenuScreenHandler extends GenericContainerScreenHandler {
     public MenuScreenHandler(int syncId, PlayerInventory playerInventory,
                              Inventory menuInventory,
                              Map<Integer, Consumer<ServerPlayerEntity>> actions) {
-        super(ScreenHandlerType.GENERIC_9X3, syncId, playerInventory, menuInventory, 3);
+        super(pickType(menuInventory.size()), syncId, playerInventory, menuInventory,
+              menuInventory.size() / 9);
         this.menuSize = menuInventory.size();
         this.actions = actions;
+    }
+
+    /** 只支持 9x3 / 9x6 两种；其余 fallback 到最接近的 9x6。*/
+    private static ScreenHandlerType<GenericContainerScreenHandler> pickType(int size) {
+        return switch (size) {
+            case 27 -> ScreenHandlerType.GENERIC_9X3;
+            case 54 -> ScreenHandlerType.GENERIC_9X6;
+            default -> ScreenHandlerType.GENERIC_9X6;
+        };
     }
 
     @Override

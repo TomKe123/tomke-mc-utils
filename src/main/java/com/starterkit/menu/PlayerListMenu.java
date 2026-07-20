@@ -17,25 +17,22 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 玩家列表子菜单。9x3 布局：
+ * 玩家列表子菜单。9x6 布局：
  *
- *   row 0: 顶部 header 装饰（亮色玻璃板 + 中央标题头颅）
- *   row 1: 前 9 个玩家（槽 9..17）
- *   row 2: [◀ prev] . . . [返回] . . . [next ▶]  底部导航
- *           18                22               26
+ *   row 0: header（中央 4 号槽显示标题指南针）
+ *   row 1-4: 玩家格 9-44 共 36 个（每页最多 36 人）
+ *   row 5: [◀ 45]  .  .  .  [返回 49]  .  .  .  [▶ 53]
  *
- * 每页最多 9 个玩家（槽 9-17）——比之前的 21 少，但配合按距离排序，
- * 一屏能看到"离我最近的 9 个"就够用。翻页更容易的话，找远处玩家也不难。
- *
+ * 每页最多 36 个玩家，实际服务器几乎不会溢出。
  * 排序规则：同维度的按跟观察者的距离升序，跨维度的排在最后（无距离数值）。
  */
 public final class PlayerListMenu {
 
-    private static final int PAGE_SIZE = 9;
+    private static final int PAGE_SIZE = 36;
     private static final int FIRST_SLOT = 9;
-    private static final int PREV_SLOT = 18;
-    private static final int BACK_SLOT = 22;
-    private static final int NEXT_SLOT = 26;
+    private static final int PREV_SLOT = 45;
+    private static final int BACK_SLOT = 49;
+    private static final int NEXT_SLOT = 53;
     private static final Text TITLE = Text.literal("§b§l§n在线玩家");
 
     private PlayerListMenu() {}
@@ -57,7 +54,7 @@ public final class PlayerListMenu {
         int totalPages = Math.max(1, (others.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(0, Math.min(page, totalPages - 1));
 
-        Inventory inv = MenuScreenHandler.buildInventory(3);
+        Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
         // header 中央显示总人数

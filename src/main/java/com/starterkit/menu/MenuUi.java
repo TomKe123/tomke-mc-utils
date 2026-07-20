@@ -22,22 +22,25 @@ import java.util.function.Consumer;
 /**
  * 主菜单构造与打开入口。
  *
- * 布局 9x3：
+ * 布局 9x6：
  *
  *   槽位:  0  1  2  3  4  5  6  7  8
  *          ■  ■  ■  ■  ✧  ■  ■  ■  ■     row 0  4=玩家信息卡
- *          ■  ■ 11  ■ 13  ■ 15  ■  ■     row 1  11/13/15=主功能
- *          ■  ■ 20  ■ 22  ■ 24  ■ 26     row 2  20/22/24=次功能  26=关闭
+ *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 1  装饰
+ *          ■  ■ 20  ■ 22  ■ 24  ■  ■     row 2  20/22/24=主功能
+ *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 3  装饰
+ *          ■  ■ 38  ■ 40  ■ 42  ■  ■     row 4  38/40/42=次功能
+ *          ■  ■  ■  ■  ■  ■  ■  ■ 53     row 5  53=关闭
  *
  * 按钮:
  *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
- *   11 - 出生点(床)
- *   13 - 飞行切换(羽毛, 开启时发光)
- *   15 - 领取 Kit (箱子)
- *   20 - 服务器地标(地图)
- *   22 - 在线玩家(头颅)
- *   24 - 本包配方(工作台)
- *   26 - 关闭(屏障)
+ *   20 - 出生点(床)
+ *   22 - 飞行切换(羽毛, 开启时发光)
+ *   24 - 领取 Kit (箱子)
+ *   38 - 服务器地标(地图)
+ *   40 - 在线玩家(头颅)
+ *   42 - 本包配方(工作台)
+ *   53 - 关闭(屏障)
  *
  * 空槽全部用灰色玻璃板铺满，避免"透视格"感。
  */
@@ -46,34 +49,35 @@ public final class MenuUi {
     private MenuUi() {}
 
     public static void open(ServerPlayerEntity player) {
-        Inventory inv = MenuScreenHandler.buildInventory(3);
+        Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
         // 顶部中央：玩家信息卡（不响应点击，仅展示）
         inv.setStack(4, playerInfoCard(player));
 
-        // 中央行：3 个主要功能
-        inv.setStack(11, spawnButton(player));
-        actions.put(11, MenuUi::tpSpawn);
+        // 主功能行 (row 2)
+        inv.setStack(20, spawnButton(player));
+        actions.put(20, MenuUi::tpSpawn);
 
-        inv.setStack(13, flyButton(player));
-        actions.put(13, MenuUi::toggleFly);
+        inv.setStack(22, flyButton(player));
+        actions.put(22, MenuUi::toggleFly);
 
-        inv.setStack(15, kitButton(player));
-        actions.put(15, MenuUi::giveKit);
+        inv.setStack(24, kitButton(player));
+        actions.put(24, MenuUi::giveKit);
 
-        // 底部导航
-        inv.setStack(20, landmarkButton());
-        actions.put(20, LandmarkMenu::open);
+        // 次功能行 (row 4)
+        inv.setStack(38, landmarkButton());
+        actions.put(38, LandmarkMenu::open);
 
-        inv.setStack(22, playerListButton(player));
-        actions.put(22, PlayerListMenu::open);
+        inv.setStack(40, playerListButton(player));
+        actions.put(40, PlayerListMenu::open);
 
-        inv.setStack(24, recipeButton(player));
-        actions.put(24, RecipeMenu::open);
+        inv.setStack(42, recipeButton(player));
+        actions.put(42, RecipeMenu::open);
 
-        inv.setStack(26, MenuButtons.closeButton());
-        actions.put(26, ServerPlayerEntity::closeHandledScreen);
+        // 关闭按钮
+        inv.setStack(53, MenuButtons.closeButton());
+        actions.put(53, ServerPlayerEntity::closeHandledScreen);
 
         // 剩下的空位铺满玻璃板
         MenuButtons.fillBackground(inv);
