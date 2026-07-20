@@ -1,0 +1,53 @@
+package com.starterkit;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.tree.CommandNode;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.server.command.ServerCommandSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Field;
+import java.util.function.Predicate;
+
+/**
+ * 把 /tp 和 /teleport 的权限门槛降到 0，让所有玩家都能使用。
+ *
+ * vanilla 会在这两个根节点上挂 `source.hasPermissionLevel(2)` 作为 requires。
+ * CommandRegistrationCallback 在所有 vanilla 命令注册完之后触发，我们在这里
+ * 走到目标节点，用反射把 requirement 换成恒为 true。
+ *
+ * 注意：EntitySelectorReader 在 parse 阶段自带一层权限检查，
+ * 用 @a / @e / @r 等选择器仍然会被拒；直接写玩家名（例：`/tp Alice`）
+ * 或坐标（例：`/tp 100 64 100`）不受影响。
+ */
+public final class TpPermission {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(StarterKitMod.MOD_ID);
+    private static final Predicate<ServerCommandSource> ALWAYS_ALLOW = src -> true;
+
+    private TpPermission() {}
+
+    public static void register() {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            openPermission(dispatcher, "tp");
+            openPermission(dispatcher, "teleport");
+        });
+    }
+
+    private static void openPermission(CommandDispatcher<ServerCommandSource> dispatcher, String name) {
+        CommandNode<ServerCommandSource> node = dispatcher.getRoot().getChild(name);
+        if (node == null) {
+            LOGGER.warn("[StarterKit] /{} 节点未找到，跳过权限调整。", name);
+            return;
+        }
+        try {
+            Field requirement = CommandNode.class.getDeclaredField("requirement");
+            requirement.setAccessible(true);
+            requirement.set(node, ALWAYS_ALLOW);
+            LOGGER.info("[StarterKit] /{} 已对所有玩家开放。", name);
+        } catch (ReflectiveOperationException e) {
+            LOGGER.error("[StarterKit] 无法调整 /{} 的权限：", name, e);
+        }
+    }
+}

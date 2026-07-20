@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {"item": "minecraft:lapis_ore"},
+  "result": "minecraft:deepslate_lapis_ore",
+  "count": 1
+}

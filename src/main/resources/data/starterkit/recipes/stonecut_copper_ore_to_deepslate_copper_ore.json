@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {"item": "minecraft:copper_ore"},
+  "result": "minecraft:deepslate_copper_ore",
+  "count": 1
+}
