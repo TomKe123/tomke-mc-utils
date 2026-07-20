@@ -53,9 +53,9 @@ public final class MenuUi {
             List.of("§7开启/关闭 /fly。", "§7飞行会消耗经验。")));
         actions.put(12, MenuUi::toggleFly);
 
-        // 领取 Kit
+        // 领取 Kit（菜单入口无次数限制）
         inv.setStack(14, button(Items.CHEST, "§f领取新手 Kit",
-            List.of("§7领取一次性新手装备。", "§7已领取过则会提示。")));
+            List.of("§7领取一套新手装备。", "§8可反复领取")));
         actions.put(14, MenuUi::giveKit);
 
         // 玩家列表
@@ -99,12 +99,12 @@ public final class MenuUi {
     }
 
     private static void giveKit(ServerPlayerEntity player) {
-        if (KitTracker.hasClaimed(player.getUuid())) {
-            player.sendMessage(Text.literal("你已经领取过 Kit。").formatted(Formatting.RED), true);
-            return;
-        }
+        // 菜单入口：允许反复领取。同时把 KitTracker 标记补上，
+        // 保证下次登录不再被弹出"点击领取 Kit"的欢迎消息。
         KitCommand.giveKitItems(player);
-        KitTracker.markClaimed(player.getUuid());
+        if (!KitTracker.hasClaimed(player.getUuid())) {
+            KitTracker.markClaimed(player.getUuid());
+        }
         player.sendMessage(Text.literal("已领取 Kit！").formatted(Formatting.GREEN), true);
         player.closeHandledScreen();
     }

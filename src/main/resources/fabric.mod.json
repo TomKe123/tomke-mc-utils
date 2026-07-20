@@ -11,6 +11,9 @@
   "entrypoints": {
     "main": ["com.starterkit.StarterKitMod"]
   },
+  "mixins": [
+    "starterkit.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.16.0",
     "fabric-api": "*",
