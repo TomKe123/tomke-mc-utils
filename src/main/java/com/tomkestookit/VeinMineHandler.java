@@ -1,8 +1,11 @@
 package com.tomkestookit;
 
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.block.LeavesBlock;
+import net.minecraft.block.MushroomBlock;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.ItemStack;
@@ -27,9 +30,8 @@ import java.util.List;
  *
  * 分派规则：
  *   - 起始块属于 BlockTags.LOGS + 主手斧头 → 走 tree 分支
- *   - 起始块所在的任意 tag 名以 "_ores" 结尾 + 主手镐 → 走 ore 分支
- *
- * 每个分支各自做二次判定（树：是否自然树；矿：连片同类矿）。
+ *   - 起始块是 MushroomBlock + 主手斧头 → 走 mushroom 分支
+ *   - 起始块所在的任意 tag 名以 "_ores" 结尾 + 主手镐 → 走 ore 分支（单次只连锁同种矿）
  */
 public final class VeinMineHandler {
 
@@ -53,8 +55,12 @@ public final class VeinMineHandler {
 
         VeinMine.IN_PROGRESS.add(sp.getUuid());
         try {
-            if (state.isIn(BlockTags.LOGS) && tool.getItem() instanceof AxeItem) {
-                handleTree(sw, sp, tool, pos);
+            if (tool.getItem() instanceof AxeItem) {
+                if (state.isIn(BlockTags.LOGS)) {
+                    handleTree(sw, sp, tool, pos);
+                } else if (state.getBlock() instanceof MushroomBlock) {
+                    handleMushroom(sw, sp, tool, pos, state);
+                }
             } else if (isOreState(state) && tool.getItem() instanceof PickaxeItem) {
                 handleOre(sw, sp, tool, pos, state);
             }
@@ -71,8 +77,7 @@ public final class VeinMineHandler {
      */
     private static void handleTree(ServerWorld world, ServerPlayerEntity player,
                                    ItemStack tool, BlockPos origin) {
-        BlockState originState = world.getBlockState(origin); // AIR，起始已破
-        List<BlockPos> logs = VeinMine.collect(world, origin, originState,
+        List<BlockPos> logs = VeinMine.collect(world, origin, null,
             (o, n) -> n.isIn(BlockTags.LOGS));
         if (!hasNaturalLeaf(world, origin, logs)) return;
         VeinMine.breakAll(world, player, tool, logs);
@@ -95,28 +100,81 @@ public final class VeinMineHandler {
         return false;
     }
 
+    // ------------------------------------------------------------------ mushroom
+
+    /**
+     * 大蘑菇连锁：BFS 收集所有相连的 MushroomBlock（茎 + 蘑菇帽），
+     * 自然检测：连通图中同时存在茎（MUSHROOM_STEM）和帽（RED/BROWN_MUSHROOM_BLOCK）才触发。
+     */
+    private static void handleMushroom(ServerWorld world, ServerPlayerEntity player,
+                                       ItemStack tool, BlockPos origin, BlockState originState) {
+        List<BlockPos> blocks = VeinMine.collect(world, origin, null,
+            (o, n) -> n.getBlock() instanceof MushroomBlock);
+        if (!isNaturalMushroom(world, origin, originState, blocks)) return;
+        VeinMine.breakAll(world, player, tool, blocks);
+    }
+
+    /**
+     * 自然大蘑菇判定：起始块 + BFS 结果中，同时包含茎和帽才视为一棵自然蘑菇。
+     * 玩家单独放置的蘑菇方块不触发。
+     */
+    private static boolean isNaturalMushroom(ServerWorld world, BlockPos origin,
+                                             BlockState originState, List<BlockPos> blocks) {
+        boolean hasStem = isStem(originState);
+        boolean hasCap = isCap(originState);
+        for (BlockPos p : blocks) {
+            if (hasStem && hasCap) return true;
+            BlockState s = world.getBlockState(p);
+            if (!hasStem && isStem(s)) hasStem = true;
+            if (!hasCap && isCap(s)) hasCap = true;
+        }
+        return hasStem && hasCap;
+    }
+
+    private static boolean isStem(BlockState state) {
+        return state.isOf(Blocks.MUSHROOM_STEM);
+    }
+
+    private static boolean isCap(BlockState state) {
+        return state.isOf(Blocks.RED_MUSHROOM_BLOCK) || state.isOf(Blocks.BROWN_MUSHROOM_BLOCK);
+    }
+
     // ------------------------------------------------------------------ ore
 
     /**
-     * 矿物连锁：BFS 连通"共享至少一个 _ores tag"的方块（跨石头/深板岩变体一起吃）。
-     * tag 发现法自动兼容 Forge #forge:ores/* 和 mod 新增的 mymod:*_ores。
+     * 矿物连锁：BFS 连通"共享至少一个特定 ore tag"的方块（跨石头/深板岩变体一起吃）。
+     * 使用 isSpecificOreTag 而非 isOreTag 做 BFS 匹配，排除 "ores" 宽泛 tag，
+     * 确保单次只连锁同一种矿物。
      */
     private static void handleOre(ServerWorld world, ServerPlayerEntity player,
                                   ItemStack tool, BlockPos origin, BlockState originState) {
         List<BlockPos> ores = VeinMine.collect(world, origin, originState,
-            (o, n) -> VeinMine.sharesTag(o, n, VeinMineHandler::isOreTag));
+            (o, n) -> VeinMine.sharesTag(o, n, VeinMineHandler::isSpecificOreTag));
         if (ores.isEmpty()) return;
         VeinMine.breakAll(world, player, tool, ores);
     }
 
-    /** 判定方块是否属于某种矿：任意 tag 的 registry key 路径以 "_ores" 结尾。*/
+    /** 判定方块是否属于某种矿：任意 tag 的 path 匹配 ore 命名规则。*/
     private static boolean isOreState(BlockState state) {
         return state.streamTags().anyMatch(VeinMineHandler::isOreTag);
     }
 
-    /** tag 的 path 以 "_ores" 结尾即视为矿类 tag，例如 minecraft:coal_ores、forge:ores/iron。*/
-    private static boolean isOreTag(TagKey<net.minecraft.block.Block> tag) {
+    /**
+     * 宽泛 ore tag 检测（用于"这个方块是不是矿"的初始判定）。
+     * 包含 _ores / ores/ / ores 三种模式。
+     */
+    private static boolean isOreTag(TagKey<Block> tag) {
         String path = tag.id().getPath();
         return path.endsWith("_ores") || path.startsWith("ores/") || path.equals("ores");
+    }
+
+    /**
+     * 具体 ore tag 检测（用于 BFS 同类匹配）。
+     * 排除宽泛的 "ores" tag（所有矿物都在里面），只保留 _ores 和 ores/* 这类
+     * 细分 tag，保证单次只连锁一种矿。
+     */
+    private static boolean isSpecificOreTag(TagKey<Block> tag) {
+        String path = tag.id().getPath();
+        return path.endsWith("_ores") || path.startsWith("ores/");
     }
 }
