@@ -140,14 +140,14 @@ public final class VeinMineHandler {
     }
 
     /**
-     * 在被砍树的最低点补种一棵对应树苗（下界菌类同理）。
-     * 消耗玩家背包里的一株树苗；没有对应树苗则跳过（不打扰）。
+     * 在被砍树的最低点自动补种一棵对应树苗（下界菌类同理）。
+     * 不消耗玩家物品——连锁砍树的 QoL：自动在树基位置生成树苗。
      *
      * 补种规则：
-     *   - 树苗种类：originState 查 LOG_TO_SAPLING（起始块类型决定，不管连锁中混了什么）
+     *   - 树苗种类：originState 查 LOG_TO_SAPLING（起始块类型决定）
      *   - 位置：(origin + logs) 里 Y 最小的位置（树基）
      *   - 合法性：sapling.canPlaceAt 判定支撑方块（草/土/菌岩...）
-     *   - 从背包扣一株，找不到就跳过
+     *     不满足则跳过（如空中的浮木）
      */
     private static void replantSapling(ServerWorld world, ServerPlayerEntity player,
                                         BlockPos origin, List<BlockPos> logs,
@@ -166,27 +166,13 @@ public final class VeinMineHandler {
 
         // 支撑方块合法性（草/土/菌岩...）
         if (!saplingState.canPlaceAt(world, plantAt)) return;
-
-        // 从背包扣一株
-        if (!consumeOneFromInventory(player, saplingItem)) return;
+        // 目标位置必须为空气（不能覆盖其他方块）
+        if (!world.getBlockState(plantAt).isAir()) return;
 
         world.setBlockState(plantAt, saplingState, Block.NOTIFY_ALL);
         world.playSound(null, plantAt,
             net.minecraft.sound.SoundEvents.BLOCK_GRASS_PLACE,
             SoundCategory.BLOCKS, 0.8f, 1.0f);
-    }
-
-    /** 从玩家背包（含主/副手/热键栏/主格）扣一个指定 item，成功返回 true。*/
-    private static boolean consumeOneFromInventory(ServerPlayerEntity player, Item item) {
-        var inv = player.getInventory();
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack s = inv.getStack(i);
-            if (s.isOf(item)) {
-                s.decrement(1);
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
