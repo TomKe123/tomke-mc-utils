@@ -71,30 +71,43 @@ public final class VeinMineHandler {
     // ------------------------------------------------------------------ tree
 
     /**
-     * 树木连锁：BFS 连通 log → 判定"是否有天然叶子（PERSISTENT=false）附着"
+     * 树木连锁：BFS 连通 log → 判定"是否有天然树叶/菌类附着"
      * → 是则批量破坏。玩家自建的木屋墙壁不触发。
      */
     private static void handleTree(ServerWorld world, ServerPlayerEntity player,
                                    ItemStack tool, BlockPos origin) {
         List<BlockPos> logs = VeinMine.collect(world, origin, null,
             (o, n) -> n.isIn(BlockTags.LOGS));
-        if (!hasNaturalLeaf(world, origin, logs)) return;
+        if (!hasNaturalFoliage(world, origin, logs)) return;
         VeinMine.breakAll(world, player, tool, logs);
     }
 
-    /** 起始块 + 所有已 BFS 的 log 的 6 邻居中，是否有至少一片 PERSISTENT=false 叶子。*/
-    private static boolean hasNaturalLeaf(ServerWorld world, BlockPos origin, List<BlockPos> logs) {
-        if (checkLeafNeighbors(world, origin)) return true;
-        for (BlockPos p : logs) if (checkLeafNeighbors(world, p)) return true;
+    /**
+     * 起始块 + 所有已 BFS 的 log 的 6 邻居中，是否有天然树叶或下界疣块。
+     * 主世界树：LeavesBlock 且 PERSISTENT=false
+     * 下界树：NETHER_WART_BLOCK / WARPED_WART_BLOCK / SHROOMLIGHT
+     */
+    private static boolean hasNaturalFoliage(ServerWorld world, BlockPos origin, List<BlockPos> logs) {
+        if (checkFoliageNeighbors(world, origin)) return true;
+        for (BlockPos p : logs) if (checkFoliageNeighbors(world, p)) return true;
         return false;
     }
 
-    private static boolean checkLeafNeighbors(ServerWorld world, BlockPos center) {
+    private static boolean checkFoliageNeighbors(ServerWorld world, BlockPos center) {
         for (int[] off : VeinMine.NEIGHBOR_6) {
             BlockPos p = center.add(off[0], off[1], off[2]);
             BlockState s = world.getBlockState(p);
-            if (!(s.getBlock() instanceof LeavesBlock)) continue;
-            if (!s.get(LeavesBlock.PERSISTENT)) return true;
+            // 主世界树叶（非玩家放置）
+            if (s.getBlock() instanceof LeavesBlock) {
+                if (!s.get(LeavesBlock.PERSISTENT)) return true;
+                continue;
+            }
+            // 下界树的"树叶"：疣块和菌光体
+            if (s.isOf(Blocks.NETHER_WART_BLOCK)
+                || s.isOf(Blocks.WARPED_WART_BLOCK)
+                || s.isOf(Blocks.SHROOMLIGHT)) {
+                return true;
+            }
         }
         return false;
     }
