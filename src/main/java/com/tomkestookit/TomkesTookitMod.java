@@ -23,7 +23,7 @@ public class TomkesTookitMod implements ModInitializer {
     public void onInitialize() {
         KitCommand.register();
         AntigravBootsHandler.register();
-        TpPermission.register();
+        CommandPermission.register();
         SleepPercentage.register();
         FlyCommand.register();
         EntityCaptureHandler.register();
