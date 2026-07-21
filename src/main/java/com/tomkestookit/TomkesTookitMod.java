@@ -34,6 +34,7 @@ public class TomkesTookitMod implements ModInitializer {
         MenuClock.register();
         LandmarkCommand.register();
         BackCommand.register();
+        ChatModeToggle.register();
         Sidebar.register();
         TabHealth.register();
 

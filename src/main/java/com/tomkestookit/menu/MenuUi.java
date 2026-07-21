@@ -29,7 +29,7 @@ import java.util.function.Consumer;
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 1  装饰
  *          9  ■ 11  ■ 13  ■ 15  ■ 17     row 2  9/11/13/15/17=动作类（5）
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 3  装饰
- *          ■ 37  ■ 39  ■ 41  ■ 43  ■     row 4  37/39/41/43=开关/浏览类（4）
+ *         36  ■ 38  ■ 40  ■ 42  ■ 44     row 4  36/38/40/42/44=开关/浏览类（5）
  *          ■  ■  ■  ■  ■  ■  ■  ■ 53     row 5  53=关闭
  *
  * 按钮:
@@ -39,10 +39,11 @@ import java.util.function.Consumer;
  *   13 - 领取 Kit (箱子)
  *   15 - 在线玩家(头颅)
  *   17 - 服务器地标(地图)
- *   37 - 飞行切换(羽毛, 开启时发光)
- *   39 - 连锁采集(木斧, 开启时发光)
- *   41 - 实体抓取(刷怪蛋, 开启时发光)
- *   43 - 本包配方(工作台)
+ *   36 - 飞行切换(羽毛, 开启时发光)
+ *   38 - 连锁采集(木斧, 开启时发光)
+ *   40 - 实体抓取(刷怪蛋, 开启时发光)
+ *   42 - 本包配方(工作台)
+ *   44 - 生存/旁观切换(末影之眼)
  *   53 - 关闭(屏障)
  *
  * 空槽全部用灰色玻璃板铺满，避免"透视格"感。
@@ -74,18 +75,21 @@ public final class MenuUi {
         inv.setStack(17, landmarkButton());
         actions.put(17, LandmarkMenu::open);
 
-        // 开关/浏览行 (row 4)：4 个横向均分按钮
-        inv.setStack(37, flyButton(player));
-        actions.put(37, MenuUi::toggleFly);
+        // 开关/浏览行 (row 4)：5 个横向均分按钮
+        inv.setStack(36, flyButton(player));
+        actions.put(36, MenuUi::toggleFly);
 
-        inv.setStack(39, veinMineButton(player));
-        actions.put(39, MenuUi::toggleVeinMine);
+        inv.setStack(38, veinMineButton(player));
+        actions.put(38, MenuUi::toggleVeinMine);
 
-        inv.setStack(41, entityCaptureButton(player));
-        actions.put(41, MenuUi::toggleEntityCapture);
+        inv.setStack(40, entityCaptureButton(player));
+        actions.put(40, MenuUi::toggleEntityCapture);
 
-        inv.setStack(43, recipeButton(player));
-        actions.put(43, RecipeMenu::open);
+        inv.setStack(42, recipeButton(player));
+        actions.put(42, RecipeMenu::open);
+
+        inv.setStack(44, gameModeButton(player));
+        actions.put(44, MenuUi::toggleGameMode);
 
         // 关闭按钮
         inv.setStack(53, MenuButtons.closeButton());
@@ -209,6 +213,22 @@ public final class MenuUi {
         return MenuButtons.button(Items.MAP, "§f§l服务器地标", lore);
     }
 
+    private static ItemStack gameModeButton(ServerPlayerEntity player) {
+        net.minecraft.world.GameMode cur = player.interactionManager.getGameMode();
+        boolean isSpectator = cur == net.minecraft.world.GameMode.SPECTATOR;
+        String targetName = isSpectator ? "生存" : "旁观";
+        List<String> lore = List.of(
+            "§7当前 §f" + com.tomkestookit.ChatModeToggle.label(cur),
+            "§7点击切换到 §f" + targetName,
+            "§8聊天快捷键 §7!c §8/ §7!s",
+            "",
+            "§a▶ 点击切换"
+        );
+        ItemStack stack = MenuButtons.button(Items.ENDER_EYE, "§f§l生存/旁观切换", lore);
+        if (isSpectator) MenuButtons.withGlow(stack);
+        return stack;
+    }
+
     private static ItemStack recipeButton(ServerPlayerEntity player) {
         int total = 0;
         for (var r : player.getServer().getRecipeManager().values()) {
@@ -283,6 +303,15 @@ public final class MenuUi {
     private static void toggleFly(ServerPlayerEntity player) {
         player.getServer().getCommandManager().executeWithPrefix(
             player.getCommandSource(), "fly");
+        player.closeHandledScreen();
+    }
+
+    private static void toggleGameMode(ServerPlayerEntity player) {
+        net.minecraft.world.GameMode cur = player.interactionManager.getGameMode();
+        net.minecraft.world.GameMode target = (cur == net.minecraft.world.GameMode.SPECTATOR)
+            ? net.minecraft.world.GameMode.SURVIVAL
+            : net.minecraft.world.GameMode.SPECTATOR;
+        com.tomkestookit.ChatModeToggle.apply(player, target);
         player.closeHandledScreen();
     }
 
