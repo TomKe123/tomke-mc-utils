@@ -36,6 +36,8 @@ public final class EntityCaptureHandler {
             if (!player.isSneaking()) return ActionResult.PASS;
             if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
             if (entity instanceof PlayerEntity) return ActionResult.PASS;
+            // 开关默认关闭，玩家需在菜单中主动开启
+            if (!EntityCaptureTracker.isEnabled(serverPlayer.getUuid())) return ActionResult.PASS;
 
             // 只有主手完全为空才触发。UseEntityCallback 会以主手和副手分别触发一次，
             // 用副手时 hand == OFF_HAND 也直接跳过（原版副手交互会额外走一遍主手判定）。

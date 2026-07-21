@@ -33,6 +33,7 @@ public class TomkesTookitMod implements ModInitializer {
         VeinMineHandler.register();
         MenuClock.register();
         LandmarkCommand.register();
+        BackCommand.register();
         Sidebar.register();
         TabHealth.register();
 
@@ -40,6 +41,8 @@ public class TomkesTookitMod implements ModInitializer {
             KitTracker.load(server);
             LandmarkStore.load(server);
             VeinMineTracker.load(server);
+            DeathLocationTracker.load(server);
+            EntityCaptureTracker.load(server);
             LOGGER.info("TomkesTookit loaded.");
         });
 

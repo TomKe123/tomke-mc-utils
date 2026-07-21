@@ -27,20 +27,22 @@ import java.util.function.Consumer;
  *   槽位:  0  1  2  3  4  5  6  7  8
  *          ■  ■  ■  ■  ✧  ■  ■  ■  ■     row 0  4=玩家信息卡
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 1  装饰
- *          ■ 10  ■ 12  ■ 14  ■ 16  ■     row 2  10/12/14/16=动作类
+ *          9  ■ 11  ■ 13  ■ 15  ■ 17     row 2  9/11/13/15/17=动作类（5）
  *          ■  ■  ■  ■  ■  ■  ■  ■  ■     row 3  装饰
- *          ■  ■ 38  ■ 40  ■ 42  ■  ■     row 4  38/40/42=开关/浏览类
+ *          ■ 37  ■ 39  ■ 41  ■ 43  ■     row 4  37/39/41/43=开关/浏览类（4）
  *          ■  ■  ■  ■  ■  ■  ■  ■ 53     row 5  53=关闭
  *
  * 按钮:
  *   4  - 玩家信息卡(玩家头颅) - 顶部中央（无 action）
- *   10 - 出生点(床)
- *   12 - 领取 Kit (箱子)
- *   14 - 在线玩家(头颅)
- *   16 - 服务器地标(地图)
- *   38 - 飞行切换(羽毛, 开启时发光)
- *   40 - 连锁采集(木斧, 开启时发光)
- *   42 - 本包配方(工作台)
+ *   9  - 返回死亡地点(骨头, 无记录时灰显)
+ *   11 - 出生点(床)
+ *   13 - 领取 Kit (箱子)
+ *   15 - 在线玩家(头颅)
+ *   17 - 服务器地标(地图)
+ *   37 - 飞行切换(羽毛, 开启时发光)
+ *   39 - 连锁采集(木斧, 开启时发光)
+ *   41 - 实体抓取(刷怪蛋, 开启时发光)
+ *   43 - 本包配方(工作台)
  *   53 - 关闭(屏障)
  *
  * 空槽全部用灰色玻璃板铺满，避免"透视格"感。
@@ -56,28 +58,34 @@ public final class MenuUi {
         // 顶部中央：玩家信息卡（不响应点击，仅展示）
         inv.setStack(4, playerInfoCard(player));
 
-        // 动作行 (row 2)：4 个居中按钮
-        inv.setStack(10, spawnButton(player));
-        actions.put(10, MenuUi::tpSpawn);
+        // 动作行 (row 2)：5 个横向均分按钮
+        inv.setStack(9, backButton(player));
+        actions.put(9, MenuUi::tpDeath);
 
-        inv.setStack(12, kitButton(player));
-        actions.put(12, MenuUi::giveKit);
+        inv.setStack(11, spawnButton(player));
+        actions.put(11, MenuUi::tpSpawn);
 
-        inv.setStack(14, playerListButton(player));
-        actions.put(14, PlayerListMenu::open);
+        inv.setStack(13, kitButton(player));
+        actions.put(13, MenuUi::giveKit);
 
-        inv.setStack(16, landmarkButton());
-        actions.put(16, LandmarkMenu::open);
+        inv.setStack(15, playerListButton(player));
+        actions.put(15, PlayerListMenu::open);
 
-        // 开关/浏览行 (row 4)：3 个居中按钮
-        inv.setStack(38, flyButton(player));
-        actions.put(38, MenuUi::toggleFly);
+        inv.setStack(17, landmarkButton());
+        actions.put(17, LandmarkMenu::open);
 
-        inv.setStack(40, veinMineButton(player));
-        actions.put(40, MenuUi::toggleVeinMine);
+        // 开关/浏览行 (row 4)：4 个横向均分按钮
+        inv.setStack(37, flyButton(player));
+        actions.put(37, MenuUi::toggleFly);
 
-        inv.setStack(42, recipeButton(player));
-        actions.put(42, RecipeMenu::open);
+        inv.setStack(39, veinMineButton(player));
+        actions.put(39, MenuUi::toggleVeinMine);
+
+        inv.setStack(41, entityCaptureButton(player));
+        actions.put(41, MenuUi::toggleEntityCapture);
+
+        inv.setStack(43, recipeButton(player));
+        actions.put(43, RecipeMenu::open);
 
         // 关闭按钮
         inv.setStack(53, MenuButtons.closeButton());
@@ -108,6 +116,29 @@ public final class MenuUi {
         );
         return MenuButtons.skull(player.getGameProfile(),
             "§e§l" + player.getGameProfile().getName(), lore);
+    }
+
+    private static ItemStack backButton(ServerPlayerEntity player) {
+        com.tomkestookit.DeathLocationTracker.DeathLocation loc =
+            com.tomkestookit.DeathLocationTracker.get(player.getUuid());
+        List<String> lore;
+        if (loc == null) {
+            lore = List.of(
+                "§7暂无死亡记录",
+                "§7死亡后会记录坐标",
+                "",
+                "§8点击无效"
+            );
+        } else {
+            String dim = dimShort(loc.dimension);
+            lore = List.of(
+                "§7死亡坐标 §f" + (int) Math.floor(loc.x) + " " + (int) Math.floor(loc.y) + " " + (int) Math.floor(loc.z),
+                "§7维度 §f" + dim,
+                "",
+                "§a▶ 点击返回"
+            );
+        }
+        return MenuButtons.button(Items.BONE, "§f§l返回死亡地点", lore);
     }
 
     private static ItemStack spawnButton(ServerPlayerEntity player) {
@@ -192,6 +223,22 @@ public final class MenuUi {
         return MenuButtons.button(Items.CRAFTING_TABLE, "§f§l本包配方", lore);
     }
 
+    private static ItemStack entityCaptureButton(ServerPlayerEntity player) {
+        boolean enabled = com.tomkestookit.EntityCaptureTracker.isEnabled(player.getUuid());
+        String status = enabled ? "§a已开启" : "§c已关闭";
+        List<String> lore = List.of(
+            "§7当前 " + status,
+            "§7§oshift + 右键§7 空手抓取生物",
+            "§7  → 收进对应刷怪蛋",
+            "§8保留 NBT（交易/驯服/命名/装备）",
+            "",
+            "§a▶ 点击切换"
+        );
+        ItemStack stack = MenuButtons.button(Items.PIG_SPAWN_EGG, "§f§l实体抓取", lore);
+        if (enabled) MenuButtons.withGlow(stack);
+        return stack;
+    }
+
     private static ItemStack veinMineButton(ServerPlayerEntity player) {
         boolean enabled = com.tomkestookit.VeinMineTracker.isEnabled(player.getUuid());
         String status = enabled ? "§a已开启" : "§c已关闭";
@@ -210,6 +257,11 @@ public final class MenuUi {
     }
 
     // ------------------------------------------------------------------ actions
+
+    private static void tpDeath(ServerPlayerEntity player) {
+        boolean ok = com.tomkestookit.BackCommand.teleportToDeath(player);
+        if (ok) player.closeHandledScreen();
+    }
 
     private static void tpSpawn(ServerPlayerEntity player) {
         BlockPos spawn = player.getSpawnPointPosition();
@@ -230,6 +282,15 @@ public final class MenuUi {
     private static void toggleFly(ServerPlayerEntity player) {
         player.getServer().getCommandManager().executeWithPrefix(
             player.getCommandSource(), "fly");
+        player.closeHandledScreen();
+    }
+
+    private static void toggleEntityCapture(ServerPlayerEntity player) {
+        boolean now = com.tomkestookit.EntityCaptureTracker.toggle(player.getUuid());
+        player.sendMessage(now
+            ? Text.literal("实体抓取已 §a开启").formatted(Formatting.GREEN)
+            : Text.literal("实体抓取已 §c关闭").formatted(Formatting.YELLOW),
+            true);
         player.closeHandledScreen();
     }
 
