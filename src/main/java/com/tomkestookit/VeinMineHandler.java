@@ -7,6 +7,8 @@ import net.minecraft.block.Blocks;
 import net.minecraft.block.LeavesBlock;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.AxeItem;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.PickaxeItem;
@@ -14,10 +16,13 @@ import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 连锁采集分派器。
@@ -35,6 +40,47 @@ import java.util.List;
  *   - 起始块所在的任意 tag 名以 "_ores" 结尾 + 主手镐 → 走 ore 分支（单次只连锁同种矿）
  */
 public final class VeinMineHandler {
+
+    /**
+     * 原木/木头/剥皮木 → 对应树苗（下界为菌类）的映射。
+     * 覆盖所有 8 种主世界树 + 2 种下界树 * 4 种变体（普通/去皮 log/wood）。
+     * 竹子(BAMBOO_BLOCK)不算树，虽然在 BlockTags.LOGS 里，跳过补种。
+     */
+    private static final Map<Block, Item> LOG_TO_SAPLING = buildSaplingMap();
+
+    private static Map<Block, Item> buildSaplingMap() {
+        Map<Block, Item> m = new HashMap<>();
+        addSpecies(m, Blocks.OAK_LOG, Blocks.OAK_WOOD,
+                     Blocks.STRIPPED_OAK_LOG, Blocks.STRIPPED_OAK_WOOD, Items.OAK_SAPLING);
+        addSpecies(m, Blocks.SPRUCE_LOG, Blocks.SPRUCE_WOOD,
+                     Blocks.STRIPPED_SPRUCE_LOG, Blocks.STRIPPED_SPRUCE_WOOD, Items.SPRUCE_SAPLING);
+        addSpecies(m, Blocks.BIRCH_LOG, Blocks.BIRCH_WOOD,
+                     Blocks.STRIPPED_BIRCH_LOG, Blocks.STRIPPED_BIRCH_WOOD, Items.BIRCH_SAPLING);
+        addSpecies(m, Blocks.JUNGLE_LOG, Blocks.JUNGLE_WOOD,
+                     Blocks.STRIPPED_JUNGLE_LOG, Blocks.STRIPPED_JUNGLE_WOOD, Items.JUNGLE_SAPLING);
+        addSpecies(m, Blocks.ACACIA_LOG, Blocks.ACACIA_WOOD,
+                     Blocks.STRIPPED_ACACIA_LOG, Blocks.STRIPPED_ACACIA_WOOD, Items.ACACIA_SAPLING);
+        addSpecies(m, Blocks.DARK_OAK_LOG, Blocks.DARK_OAK_WOOD,
+                     Blocks.STRIPPED_DARK_OAK_LOG, Blocks.STRIPPED_DARK_OAK_WOOD, Items.DARK_OAK_SAPLING);
+        addSpecies(m, Blocks.MANGROVE_LOG, Blocks.MANGROVE_WOOD,
+                     Blocks.STRIPPED_MANGROVE_LOG, Blocks.STRIPPED_MANGROVE_WOOD, Items.MANGROVE_PROPAGULE);
+        addSpecies(m, Blocks.CHERRY_LOG, Blocks.CHERRY_WOOD,
+                     Blocks.STRIPPED_CHERRY_LOG, Blocks.STRIPPED_CHERRY_WOOD, Items.CHERRY_SAPLING);
+        // 下界树：茎/hyphae → 菌类
+        addSpecies(m, Blocks.CRIMSON_STEM, Blocks.CRIMSON_HYPHAE,
+                     Blocks.STRIPPED_CRIMSON_STEM, Blocks.STRIPPED_CRIMSON_HYPHAE, Items.CRIMSON_FUNGUS);
+        addSpecies(m, Blocks.WARPED_STEM, Blocks.WARPED_HYPHAE,
+                     Blocks.STRIPPED_WARPED_STEM, Blocks.STRIPPED_WARPED_HYPHAE, Items.WARPED_FUNGUS);
+        return Map.copyOf(m);
+    }
+
+    private static void addSpecies(Map<Block, Item> m, Block log, Block wood,
+                                    Block strippedLog, Block strippedWood, Item sapling) {
+        m.put(log, sapling);
+        m.put(wood, sapling);
+        m.put(strippedLog, sapling);
+        m.put(strippedWood, sapling);
+    }
 
     private VeinMineHandler() {}
 
@@ -58,7 +104,7 @@ public final class VeinMineHandler {
         try {
             if (tool.getItem() instanceof AxeItem) {
                 if (state.isIn(BlockTags.LOGS)) {
-                    handleTree(sw, sp, tool, pos);
+                    handleTree(sw, sp, tool, pos, state);
                 } else if (isMushroom(state)) {
                     handleMushroom(sw, sp, tool, pos);
                 }
@@ -80,14 +126,67 @@ public final class VeinMineHandler {
 
     /**
      * 树木连锁：BFS 连通 log → 判定"是否有天然树叶/菌类附着"
-     * → 是则批量破坏。玩家自建的木屋墙壁不触发。
+     * → 是则批量破坏，然后尝试补种一棵。
+     * originState 是玩家砍下的起始块（AFTER 事件传入，此时块已被破坏成 AIR），
+     * 用来查 LOG_TO_SAPLING 决定补种什么。
      */
     private static void handleTree(ServerWorld world, ServerPlayerEntity player,
-                                   ItemStack tool, BlockPos origin) {
+                                   ItemStack tool, BlockPos origin, BlockState originState) {
         List<BlockPos> logs = VeinMine.collect(world, origin, null,
             (o, n) -> n.isIn(BlockTags.LOGS));
         if (!hasNaturalFoliage(world, origin, logs)) return;
         VeinMine.breakAll(world, player, tool, logs);
+        replantSapling(world, player, origin, logs, originState);
+    }
+
+    /**
+     * 在被砍树的最低点补种一棵对应树苗（下界菌类同理）。
+     * 消耗玩家背包里的一株树苗；没有对应树苗则跳过（不打扰）。
+     *
+     * 补种规则：
+     *   - 树苗种类：originState 查 LOG_TO_SAPLING（起始块类型决定，不管连锁中混了什么）
+     *   - 位置：(origin + logs) 里 Y 最小的位置（树基）
+     *   - 合法性：sapling.canPlaceAt 判定支撑方块（草/土/菌岩...）
+     *   - 从背包扣一株，找不到就跳过
+     */
+    private static void replantSapling(ServerWorld world, ServerPlayerEntity player,
+                                        BlockPos origin, List<BlockPos> logs,
+                                        BlockState originState) {
+        Item saplingItem = LOG_TO_SAPLING.get(originState.getBlock());
+        if (saplingItem == null) return; // 未映射的 log（如竹子）
+
+        if (!(saplingItem instanceof BlockItem bi)) return;
+        BlockState saplingState = bi.getBlock().getDefaultState();
+
+        // 从 origin + logs 中找 Y 最小的位置作为树基
+        BlockPos plantAt = origin;
+        for (BlockPos p : logs) {
+            if (p.getY() < plantAt.getY()) plantAt = p;
+        }
+
+        // 支撑方块合法性（草/土/菌岩...）
+        if (!saplingState.canPlaceAt(world, plantAt)) return;
+
+        // 从背包扣一株
+        if (!consumeOneFromInventory(player, saplingItem)) return;
+
+        world.setBlockState(plantAt, saplingState, Block.NOTIFY_ALL);
+        world.playSound(null, plantAt,
+            net.minecraft.sound.SoundEvents.BLOCK_GRASS_PLACE,
+            SoundCategory.BLOCKS, 0.8f, 1.0f);
+    }
+
+    /** 从玩家背包（含主/副手/热键栏/主格）扣一个指定 item，成功返回 true。*/
+    private static boolean consumeOneFromInventory(ServerPlayerEntity player, Item item) {
+        var inv = player.getInventory();
+        for (int i = 0; i < inv.size(); i++) {
+            ItemStack s = inv.getStack(i);
+            if (s.isOf(item)) {
+                s.decrement(1);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
