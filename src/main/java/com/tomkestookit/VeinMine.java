@@ -1,6 +1,8 @@
 package com.tomkestookit;
 
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -80,12 +82,30 @@ public final class VeinMine {
     }
 
     /**
-     * 逐块 breakBlock，走 vanilla 掉落逻辑；每块扣工具 1 点耐久，坏了停手。
+     * 逐块破坏，掉落按工具附魔计算（精准采集/时运生效）。
+     * 每块扣工具 1 点耐久，坏了停手。
+     *
+     * 实现细节：vanilla 的 world.breakBlock(pos, true, player) 内部调用
+     * Block.dropStacks(..., ItemStack.EMPTY) —— 空工具，附魔无效。所以拆两步：
+     *   1) breakBlock(pos, false, player) —— 保留破坏动画/音效/更新，不掉落
+     *   2) 手动 Block.dropStacks(state, world, pos, be, player, tool)
+     *      —— 按实际工具解析 loot table，精准/时运/掉落 XP 全部生效
      */
     public static void breakAll(ServerWorld world, ServerPlayerEntity player,
                                 ItemStack tool, List<BlockPos> positions) {
         for (BlockPos p : positions) {
-            world.breakBlock(p, true, player);
+            BlockState state = world.getBlockState(p);
+            if (state.isAir()) continue;
+            BlockEntity be = state.hasBlockEntity() ? world.getBlockEntity(p) : null;
+
+            // 破坏前先算好 tool 副本用于 dropStacks，避免耐久归零后 dropStacks
+            // 拿到 EMPTY 导致精准/时运丢失
+            ItemStack toolForDrop = tool.copy();
+
+            if (world.breakBlock(p, false, player)) {
+                Block.dropStacks(state, world, p, be, player, toolForDrop);
+            }
+
             if (tool.getMaxDamage() > 0) {
                 tool.damage(1, player, pl -> pl.sendToolBreakStatus(Hand.MAIN_HAND));
                 if (tool.isEmpty()) return;

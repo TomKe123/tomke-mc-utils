@@ -2,6 +2,7 @@ package com.tomkestookit;
 
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -94,6 +95,16 @@ public final class FlyCommand {
                 enableFly(newPlayer);
             }
         });
+
+        // 走传送门（下界/末地）跨维度时不触发 AFTER_RESPAWN，abilities 在服务端
+        // 虽然保留但客户端会在维度切换后重置 flying 状态导致坠落。这里补一次
+        // sendAbilitiesUpdate 同步给客户端。
+        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register(
+            (player, origin, destination) -> {
+                if (XP_DEBT.containsKey(player.getUuid())) {
+                    enableFly(player);
+                }
+            });
     }
 
     private static int toggle(CommandContext<ServerCommandSource> ctx) {
