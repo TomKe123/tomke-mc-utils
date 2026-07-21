@@ -28,8 +28,9 @@ public final class VeinMineCommand {
                         }
                         boolean now = VeinMineTracker.toggle(player.getUuid());
                         player.sendMessage(now
-                            ? Text.literal("树木连锁采集已 §a开启").formatted(Formatting.GREEN)
-                            : Text.literal("树木连锁采集已 §c关闭").formatted(Formatting.YELLOW),
+                            ? Text.literal("连锁采集已 §a开启§f（shift+左键 斧砍树 / 镐挖矿）")
+                                .formatted(Formatting.GREEN)
+                            : Text.literal("连锁采集已 §c关闭").formatted(Formatting.YELLOW),
                             false);
                         return 1;
                     })

@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  *   14 - 在线玩家(头颅)
  *   16 - 服务器地标(地图)
  *   38 - 飞行切换(羽毛, 开启时发光)
- *   40 - 树木连锁(木斧, 开启时发光)
+ *   40 - 连锁采集(木斧, 开启时发光)
  *   42 - 本包配方(工作台)
  *   53 - 关闭(屏障)
  *
@@ -197,12 +197,14 @@ public final class MenuUi {
         String status = enabled ? "§a已开启" : "§c已关闭";
         List<String> lore = List.of(
             "§7当前 " + status,
-            "§7手持斧头砍树 §8→ §7连锁破坏原木",
+            "§7§oshift + 左键§7 触发连锁",
+            "§7  斧砍自然树 §8→ §7整棵原木",
+            "§7  镐挖矿石 §8→ §7同类连片",
             "§8上限 128 块，消耗耐久",
             "",
             "§a▶ 点击切换"
         );
-        ItemStack stack = MenuButtons.button(Items.WOODEN_AXE, "§f§l树木连锁采集", lore);
+        ItemStack stack = MenuButtons.button(Items.WOODEN_AXE, "§f§l连锁采集", lore);
         if (enabled) MenuButtons.withGlow(stack);
         return stack;
     }
@@ -234,8 +236,8 @@ public final class MenuUi {
     private static void toggleVeinMine(ServerPlayerEntity player) {
         boolean now = com.starterkit.VeinMineTracker.toggle(player.getUuid());
         player.sendMessage(now
-            ? Text.literal("树木连锁采集已 §a开启").formatted(Formatting.GREEN)
-            : Text.literal("树木连锁采集已 §c关闭").formatted(Formatting.YELLOW),
+            ? Text.literal("连锁采集已 §a开启").formatted(Formatting.GREEN)
+            : Text.literal("连锁采集已 §c关闭").formatted(Formatting.YELLOW),
             true);
         player.closeHandledScreen();
     }
