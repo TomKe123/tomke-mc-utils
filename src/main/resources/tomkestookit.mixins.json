@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "AnvilAntigravMixin",
+    "AnvilCostCapMixin",
     "CraftingResultMixin",
     "EntitySelectorPermissionMixin",
     "ServerPlayNetworkHandlerMixin"
