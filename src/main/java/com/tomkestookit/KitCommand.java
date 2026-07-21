@@ -6,8 +6,6 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtHelper;
-import net.minecraft.nbt.NbtList;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -15,7 +13,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.util.List;
-import java.util.UUID;
 
 public class KitCommand {
 
@@ -59,27 +56,14 @@ public class KitCommand {
         ItemStack boots = new ItemStack(Items.LEATHER_BOOTS);
         boots.setCustomName(Text.literal("反重力皮靴").formatted(Formatting.RED));
 
-        NbtCompound nbt = boots.getOrCreateNbt();
-        nbt.putBoolean("Unbreakable", true);
-        // 反重力标记：由 AntigravBootsHandler 识别，赋予跳跃增益和摔落减伤
-        nbt.putBoolean(AntigravBootsHandler.NBT_TAG, true);
+        // 反重力属性 + 速度 + 无损（Kit 版与铁砧转移版共用逻辑）
+        AntigravBootsHandler.applyAntigrav(boots);
 
-        // 染红色
+        // 皮靴专属：染红色
+        NbtCompound nbt = boots.getOrCreateNbt();
         NbtCompound display = nbt.contains("display") ? nbt.getCompound("display") : new NbtCompound();
         display.putInt("color", 0xFF0000);
         nbt.put("display", display);
-
-        // 速度属性（x3 移动速度）
-        NbtList attrList = new NbtList();
-        NbtCompound speedAttr = new NbtCompound();
-        speedAttr.putString("AttributeName", "generic.movement_speed");
-        speedAttr.putString("Name", "tomkestookit:speed");
-        speedAttr.putDouble("Amount", 2.0);
-        speedAttr.putInt("Operation", 2); // MULTIPLY_TOTAL
-        speedAttr.putString("Slot", "feet");
-        speedAttr.put("UUID", NbtHelper.fromUuid(UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890")));
-        attrList.add(speedAttr);
-        nbt.put("AttributeModifiers", attrList);
 
         List<ItemStack> items = List.of(
             boots,

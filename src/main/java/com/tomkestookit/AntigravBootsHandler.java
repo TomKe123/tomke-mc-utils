@@ -1,17 +1,26 @@
 package com.tomkestookit;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import com.google.common.collect.Multimap;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.attribute.EntityAttribute;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtHelper;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
+
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 处理反重力皮靴的两个被动效果：
@@ -26,6 +35,10 @@ public final class AntigravBootsHandler {
     private static final int JUMP_AMPLIFIER = 1;               // Jump Boost II
     private static final int JUMP_DURATION_TICKS = 40;         // 2 秒，覆盖刷新间隔
     private static final int REFRESH_INTERVAL_TICKS = 20;      // 每秒刷一次
+
+    /** 速度属性 UUID —— 保持稳定，一件靴子上只挂一份，多次施加也不会叠加。*/
+    private static final UUID SPEED_UUID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    private static final double SPEED_MULTIPLIER = 2.0; // MULTIPLY_TOTAL x3 移动速度
 
     private AntigravBootsHandler() {}
 
@@ -61,11 +74,67 @@ public final class AntigravBootsHandler {
         });
     }
 
-    private static boolean isWearingAntigravBoots(LivingEntity entity) {
-        ItemStack boots = entity.getEquippedStack(EquipmentSlot.FEET);
-        if (boots.isEmpty() || boots.getItem() != Items.LEATHER_BOOTS) return false;
-        NbtCompound nbt = boots.getNbt();
+    /**
+     * 把反重力属性套到目标靴子上（就地修改）：
+     *   - NBT 标记 TomkesTookitAntigrav = true（触发 tick 和摔落减伤）
+     *   - Unbreakable = true
+     *   - AttributeModifiers：把该靴材质的 vanilla 默认属性（护甲/韧性/抗击退）
+     *     复制到 NBT，再补一份速度 modifier；否则一旦 NBT 里出现
+     *     AttributeModifiers，vanilla 的默认护甲会被完全覆盖。
+     *
+     * 目标必须是穿在脚上的 ArmorItem（EquipmentSlot.FEET）。
+     */
+    public static void applyAntigrav(ItemStack boots) {
+        NbtCompound nbt = boots.getOrCreateNbt();
+        nbt.putBoolean(NBT_TAG, true);
+        nbt.putBoolean("Unbreakable", true);
+
+        NbtList attrList = new NbtList();
+
+        // 复制 vanilla armor 的默认属性
+        Multimap<EntityAttribute, EntityAttributeModifier> vanilla =
+            boots.getItem().getAttributeModifiers(EquipmentSlot.FEET);
+        for (Map.Entry<EntityAttribute, EntityAttributeModifier> e : vanilla.entries()) {
+            NbtCompound m = new NbtCompound();
+            m.putString("AttributeName", Registries.ATTRIBUTE.getId(e.getKey()).toString());
+            m.putString("Name", e.getValue().getName());
+            m.putDouble("Amount", e.getValue().getValue());
+            m.putInt("Operation", e.getValue().getOperation().getId());
+            m.putString("Slot", "feet");
+            m.put("UUID", NbtHelper.fromUuid(e.getValue().getId()));
+            attrList.add(m);
+        }
+
+        // 追加速度 modifier
+        NbtCompound speed = new NbtCompound();
+        speed.putString("AttributeName", "generic.movement_speed");
+        speed.putString("Name", "tomkestookit:speed");
+        speed.putDouble("Amount", SPEED_MULTIPLIER);
+        speed.putInt("Operation", 2); // MULTIPLY_TOTAL
+        speed.putString("Slot", "feet");
+        speed.put("UUID", NbtHelper.fromUuid(SPEED_UUID));
+        attrList.add(speed);
+
+        nbt.put("AttributeModifiers", attrList);
+    }
+
+    /** 判定物品是否已具备反重力效果（挂 NBT 即算）。*/
+    public static boolean hasAntigrav(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        NbtCompound nbt = stack.getNbt();
         return nbt != null && nbt.getBoolean(NBT_TAG);
+    }
+
+    /** 判定物品是否是穿在脚上的靴子（任意 ArmorItem 且槽位是 FEET）。*/
+    public static boolean isBoots(ItemStack stack) {
+        return !stack.isEmpty()
+            && stack.getItem() instanceof ArmorItem armor
+            && armor.getSlotType() == EquipmentSlot.FEET;
+    }
+
+    private static boolean isWearingAntigravBoots(LivingEntity entity) {
+        // 任意脚部装备只要挂着反重力 NBT 就算，兼容铁砧转移到其他靴子的情况。
+        return hasAntigrav(entity.getEquippedStack(EquipmentSlot.FEET));
     }
 
     private static boolean isFallDamage(DamageSource source) {
