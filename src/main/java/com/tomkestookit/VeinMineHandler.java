@@ -5,7 +5,6 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.LeavesBlock;
-import net.minecraft.block.MushroomBlock;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.ItemStack;
@@ -30,7 +29,7 @@ import java.util.List;
  *
  * 分派规则：
  *   - 起始块属于 BlockTags.LOGS + 主手斧头 → 走 tree 分支
- *   - 起始块是 MushroomBlock + 主手斧头 → 走 mushroom 分支
+ *   - 起始块是蘑菇方块（茎/红帽/棕帽）+ 主手斧头 → 走 mushroom 分支
  *   - 起始块所在的任意 tag 名以 "_ores" 结尾 + 主手镐 → 走 ore 分支（单次只连锁同种矿）
  */
 public final class VeinMineHandler {
@@ -58,8 +57,8 @@ public final class VeinMineHandler {
             if (tool.getItem() instanceof AxeItem) {
                 if (state.isIn(BlockTags.LOGS)) {
                     handleTree(sw, sp, tool, pos);
-                } else if (state.getBlock() instanceof MushroomBlock) {
-                    handleMushroom(sw, sp, tool, pos, state);
+                } else if (isMushroom(state)) {
+                    handleMushroom(sw, sp, tool, pos);
                 }
             } else if (isOreState(state) && tool.getItem() instanceof PickaxeItem) {
                 handleOre(sw, sp, tool, pos, state);
@@ -103,40 +102,23 @@ public final class VeinMineHandler {
     // ------------------------------------------------------------------ mushroom
 
     /**
-     * 大蘑菇连锁：BFS 收集所有相连的 MushroomBlock（茎 + 蘑菇帽），
-     * 自然检测：连通图中同时存在茎（MUSHROOM_STEM）和帽（RED/BROWN_MUSHROOM_BLOCK）才触发。
+     * 大蘑菇连锁：BFS 收集所有相连的蘑菇方块（茎 / 红帽 / 棕帽），直接批量破坏。
+     * 无"自然"检测——玩家想链接就链接，反正需要 shift+斧头，是主动动作；
+     * 单个孤立蘑菇块 BFS 为空，无副作用。
      */
     private static void handleMushroom(ServerWorld world, ServerPlayerEntity player,
-                                       ItemStack tool, BlockPos origin, BlockState originState) {
+                                       ItemStack tool, BlockPos origin) {
         List<BlockPos> blocks = VeinMine.collect(world, origin, null,
-            (o, n) -> n.getBlock() instanceof MushroomBlock);
-        if (!isNaturalMushroom(world, origin, originState, blocks)) return;
+            (o, n) -> isMushroom(n));
+        if (blocks.isEmpty()) return;
         VeinMine.breakAll(world, player, tool, blocks);
     }
 
-    /**
-     * 自然大蘑菇判定：起始块 + BFS 结果中，同时包含茎和帽才视为一棵自然蘑菇。
-     * 玩家单独放置的蘑菇方块不触发。
-     */
-    private static boolean isNaturalMushroom(ServerWorld world, BlockPos origin,
-                                             BlockState originState, List<BlockPos> blocks) {
-        boolean hasStem = isStem(originState);
-        boolean hasCap = isCap(originState);
-        for (BlockPos p : blocks) {
-            if (hasStem && hasCap) return true;
-            BlockState s = world.getBlockState(p);
-            if (!hasStem && isStem(s)) hasStem = true;
-            if (!hasCap && isCap(s)) hasCap = true;
-        }
-        return hasStem && hasCap;
-    }
-
-    private static boolean isStem(BlockState state) {
-        return state.isOf(Blocks.MUSHROOM_STEM);
-    }
-
-    private static boolean isCap(BlockState state) {
-        return state.isOf(Blocks.RED_MUSHROOM_BLOCK) || state.isOf(Blocks.BROWN_MUSHROOM_BLOCK);
+    /** 检测方块是否为大蘑菇方块（三种：茎 / 红帽 / 棕帽）。*/
+    private static boolean isMushroom(BlockState state) {
+        return state.isOf(Blocks.MUSHROOM_STEM)
+            || state.isOf(Blocks.RED_MUSHROOM_BLOCK)
+            || state.isOf(Blocks.BROWN_MUSHROOM_BLOCK);
     }
 
     // ------------------------------------------------------------------ ore
