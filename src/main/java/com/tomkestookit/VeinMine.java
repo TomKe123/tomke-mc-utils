@@ -1,0 +1,106 @@
+package com.tomkestookit;
+
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiPredicate;
+
+/**
+ * 连锁采集通用逻辑：BFS 收集 + 顺序破坏。
+ *
+ * 让两个"具体规则"（树木、矿物）共用同一套扫描/破坏骨架。上下文相关的判定
+ * 由调用方提供 predicate 决定。
+ */
+public final class VeinMine {
+
+    public static final int MAX_BLOCKS = 128;
+
+    /** 26 邻居 offset（含斜向），用于连通性 BFS。*/
+    public static final int[][] NEIGHBOR_26;
+    /** 6 邻居 offset，用于判断相邻状态（不含斜向）。*/
+    public static final int[][] NEIGHBOR_6 = {
+        {1, 0, 0}, {-1, 0, 0},
+        {0, 1, 0}, {0, -1, 0},
+        {0, 0, 1}, {0, 0, -1},
+    };
+
+    static {
+        NEIGHBOR_26 = new int[26][];
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    NEIGHBOR_26[i++] = new int[]{dx, dy, dz};
+                }
+    }
+
+    /** 防止 breakBlock 触发的 AFTER 递归。共享给所有连锁 handler。*/
+    public static final Set<UUID> IN_PROGRESS = new HashSet<>();
+
+    private VeinMine() {}
+
+    /**
+     * BFS 收集"与起始块连通、且 accept 判定为同类"的所有方块，最多 MAX_BLOCKS 个。
+     * 不包含起始块（起始已由原版事件破坏）。
+     */
+    public static List<BlockPos> collect(ServerWorld world, BlockPos origin, BlockState originState,
+                                         BiPredicate<BlockState, BlockState> accept) {
+        List<BlockPos> result = new ArrayList<>();
+        Set<BlockPos> visited = new HashSet<>();
+        visited.add(origin.toImmutable());
+        Deque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(origin);
+
+        while (!queue.isEmpty() && result.size() < MAX_BLOCKS) {
+            BlockPos current = queue.poll();
+            for (int[] off : NEIGHBOR_26) {
+                BlockPos next = current.add(off[0], off[1], off[2]);
+                if (!visited.add(next.toImmutable())) continue;
+                BlockState ns = world.getBlockState(next);
+                if (!accept.test(originState, ns)) continue;
+                result.add(next.toImmutable());
+                queue.add(next);
+                if (result.size() >= MAX_BLOCKS) break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 逐块 breakBlock，走 vanilla 掉落逻辑；每块扣工具 1 点耐久，坏了停手。
+     */
+    public static void breakAll(ServerWorld world, ServerPlayerEntity player,
+                                ItemStack tool, List<BlockPos> positions) {
+        for (BlockPos p : positions) {
+            world.breakBlock(p, true, player);
+            if (tool.getMaxDamage() > 0) {
+                tool.damage(1, player, pl -> pl.sendToolBreakStatus(Hand.MAIN_HAND));
+                if (tool.isEmpty()) return;
+            }
+        }
+    }
+
+    /**
+     * 判两个 BlockState 是否共享至少一个 tag（stream 版）。
+     * 用于矿物"同类判定"：两个矿共享至少一个 _ores tag 即算同类。
+     */
+    public static boolean sharesTag(BlockState a, BlockState b,
+                                    java.util.function.Predicate<TagKey<net.minecraft.block.Block>> filter) {
+        Set<TagKey<net.minecraft.block.Block>> aTags = new HashSet<>();
+        a.streamTags().forEach(t -> { if (filter.test(t)) aTags.add(t); });
+        return b.streamTags().anyMatch(t -> filter.test(t) && aTags.contains(t));
+    }
+}

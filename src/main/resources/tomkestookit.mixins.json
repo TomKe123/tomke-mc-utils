@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.tomkestookit.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "CraftingResultMixin",
+    "EntitySelectorPermissionMixin",
+    "ServerPlayNetworkHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

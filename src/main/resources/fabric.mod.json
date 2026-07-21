@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "id": "starterkit",
+  "id": "tomkestookit",
   "version": "1.0.0",
-  "name": "Starter Kit",
-  "description": "Sends a clickable kit message on login and registers /starterkit give",
+  "name": "Tomkes Tookit",
+  "description": "Server-side QoL toolkit: menu, landmarks, veinmine, recipes, and more",
   "authors": [],
   "contact": {},
   "license": "MIT",
   "environment": "server",
   "entrypoints": {
-    "main": ["com.starterkit.StarterKitMod"]
+    "main": ["com.tomkestookit.TomkesTookitMod"]
   },
   "mixins": [
-    "starterkit.mixins.json"
+    "tomkestookit.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.16.0",
