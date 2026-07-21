@@ -8,6 +8,7 @@ import net.minecraft.block.LeavesBlock;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.item.PickaxeItem;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.registry.tag.TagKey;
@@ -30,6 +31,7 @@ import java.util.List;
  * 分派规则：
  *   - 起始块属于 BlockTags.LOGS + 主手斧头 → 走 tree 分支
  *   - 起始块是蘑菇方块（茎/红帽/棕帽）+ 主手斧头 → 走 mushroom 分支
+ *   - 起始块是天然树叶（PERSISTENT=false）+ 主手剪刀 → 走 leaves 分支
  *   - 起始块所在的任意 tag 名以 "_ores" 结尾 + 主手镐 → 走 ore 分支（单次只连锁同种矿）
  */
 public final class VeinMineHandler {
@@ -59,6 +61,12 @@ public final class VeinMineHandler {
                     handleTree(sw, sp, tool, pos);
                 } else if (isMushroom(state)) {
                     handleMushroom(sw, sp, tool, pos);
+                }
+            } else if (tool.isOf(Items.SHEARS)) {
+                // 起始块已在 AFTER 事件里被破坏了，state 是它破坏前的样子。
+                // 剪刀连锁只处理天然叶子（避免连到玩家搭的装饰叶）。
+                if (state.getBlock() instanceof LeavesBlock && !state.get(LeavesBlock.PERSISTENT)) {
+                    handleLeaves(sw, sp, tool, pos);
                 }
             } else if (isOreState(state) && tool.getItem() instanceof PickaxeItem) {
                 handleOre(sw, sp, tool, pos, state);
@@ -132,6 +140,23 @@ public final class VeinMineHandler {
         return state.isOf(Blocks.MUSHROOM_STEM)
             || state.isOf(Blocks.RED_MUSHROOM_BLOCK)
             || state.isOf(Blocks.BROWN_MUSHROOM_BLOCK);
+    }
+
+    // ------------------------------------------------------------------ leaves
+
+    /**
+     * 树叶连锁：BFS 收集所有相连的天然树叶（PERSISTENT=false），批量破坏。
+     * 允许跨叶种类连锁（不同品种的树叶挨在一起也算同一片林冠）。
+     * 玩家自己放置的树叶（PERSISTENT=true）不参与，避免误伤装饰。
+     */
+    private static void handleLeaves(ServerWorld world, ServerPlayerEntity player,
+                                     ItemStack tool, BlockPos origin) {
+        List<BlockPos> leaves = VeinMine.collect(world, origin, null, (o, n) -> {
+            if (!(n.getBlock() instanceof LeavesBlock)) return false;
+            return !n.get(LeavesBlock.PERSISTENT);
+        });
+        if (leaves.isEmpty()) return;
+        VeinMine.breakAll(world, player, tool, leaves);
     }
 
     // ------------------------------------------------------------------ ore
