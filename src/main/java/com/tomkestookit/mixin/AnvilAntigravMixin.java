@@ -1,12 +1,9 @@
 package com.tomkestookit.mixin;
 
 import com.tomkestookit.AntigravBootsHandler;
-import net.minecraft.inventory.CraftingResultInventory;
-import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.AnvilScreenHandler;
 import net.minecraft.screen.Property;
-import net.minecraft.screen.ScreenHandler;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.spongepowered.asm.mixin.Final;
@@ -19,9 +16,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * 铁砧特殊配方：任意靴子（左槽）+ 反重力皮靴（右槽）→ 该靴子获得反重力属性。
  *
- * 拦截点：AnvilScreenHandler.updateResult TAIL —— 在 vanilla 算完后覆盖输出。
- * 左是皮靴时 vanilla 会把它当作"合并附魔"给出普通皮靴，我们必须覆盖
- * 才能正确产出反重力版。
+ * 拦截点：AnvilScreenHandler.updateResult @At("RETURN") —— 挂在所有 return 前，
+ * 覆盖 vanilla 已经算完的输出。必须用 RETURN 而不是 TAIL：vanilla 遇到
+ * 不兼容组合（如铁靴 + 皮靴）会走"清空输出 + 提前 return"路径，TAIL 抓不到；
+ * 用 RETURN 覆盖所有 return 点，保证我们能拿到最后决策权。
  *
  * 属性构造统一走 AntigravBootsHandler.applyAntigrav —— 与 Kit 掉落一致：
  *   - NBT: TomkesTookitAntigrav = true, Unbreakable = true
@@ -45,7 +43,7 @@ public abstract class AnvilAntigravMixin {
      * mixin 无法直接 @Shadow 父类的 protected final 字段，改用类型转换调用
      * ScreenHandler.getSlot() 拿槽内容，语义与直接读 input/output 一致。
      */
-    @Inject(method = "updateResult", at = @At("TAIL"))
+    @Inject(method = "updateResult", at = @At("RETURN"))
     private void tomkestookit$antigravAnvil(CallbackInfo ci) {
         AnvilScreenHandler self = (AnvilScreenHandler) (Object) this;
         ItemStack left = self.getSlot(0).getStack();
@@ -69,19 +67,11 @@ public abstract class AnvilAntigravMixin {
             );
         }
 
-        // 覆盖 vanilla 空结果槽 + 设置 XP 费用（Property.set 会自动同步给客户端）
-        setOutputStack(self, result);
+        // 覆盖 vanilla 已经写入的输出槽内容 + 设置 XP 费用
+        // Slot.setStack 修改底层 inventory，next tick 会自动同步给客户端；
+        // Property.set 有 Property 自带的 change-detection 同步机制
+        self.getSlot(2).setStack(result);
         this.levelCost.set(10);
-    }
-
-    /**
-     * 通过 CraftingResultInventory 直接 setStack，避免走 slot 的 markDirty 循环。
-     * 结果槽在铁砧里对应 output 字段。
-     */
-    private static void setOutputStack(AnvilScreenHandler self, ItemStack stack) {
-        // slot 2 是输出槽；setStack 会自动触发 onContentChanged
-        // 但 updateResult 目前正在处理内容变化，此时再触发不会形成递归
-        // （updateResult 内部不调用 onContentChanged，只有外部输入才会）
-        self.setStackInSlot(2, self.nextRevision(), stack);
+        self.sendContentUpdates();
     }
 }
