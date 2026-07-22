@@ -122,15 +122,24 @@ public final class PotionCauldronHandler {
             return ActionResult.PASS;
         }
 
+        // 当前层数：药水锅读 state；空锅视为 0
+        int currentLevel = isPotionCauldron ? state.get(LeveledCauldronBlock.LEVEL) : 0;
+        if (currentLevel >= 3) {
+            player.sendMessage(net.minecraft.text.Text.literal(
+                "炼药锅已满。").formatted(net.minecraft.util.Formatting.YELLOW), true);
+            return ActionResult.SUCCESS; // 拦下，避免 vanilla 处理
+        }
+        int newLevel = currentLevel + 1;
+
         NbtCompound nbt = potionNbt(held);
         PotionCauldronTracker.setPotion(key, nbt);
 
-        // 视觉：设为满水锅（level 3）
+        // 视觉：升到 newLevel（一瓶一层）
         world.setBlockState(pos, Blocks.WATER_CAULDRON.getDefaultState()
-            .with(LeveledCauldronBlock.LEVEL, 3), Block.NOTIFY_ALL);
+            .with(LeveledCauldronBlock.LEVEL, newLevel), Block.NOTIFY_ALL);
 
         // 悬浮字（新建或更新）
-        PotionCauldronLabel.ensureLabel(world, pos, key, nbt, 3);
+        PotionCauldronLabel.ensureLabel(world, pos, key, nbt, newLevel);
 
         // 替换玩家手中：药水 → 玻璃瓶
         if (!player.getAbilities().creativeMode) {
