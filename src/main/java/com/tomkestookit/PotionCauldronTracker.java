@@ -54,13 +54,23 @@ public final class PotionCauldronTracker {
 
     public static void load(MinecraftServer server) {
         dataFile = server.getSavePath(WorldSavePath.ROOT).resolve("data/tomkestookit_potion_cauldrons.json");
-        if (Files.exists(dataFile)) {
-            try (Reader r = Files.newBufferedReader(dataFile)) {
-                Type type = new TypeToken<Map<String, Entry>>() {}.getType();
-                Map<String, Entry> loaded = GSON.fromJson(r, type);
-                if (loaded != null) cauldrons = new HashMap<>(loaded);
-            } catch (IOException e) {
-                LOGGER.error("Failed to load potion cauldron data", e);
+        if (!Files.exists(dataFile)) return;
+        try (Reader r = Files.newBufferedReader(dataFile)) {
+            Type type = new TypeToken<Map<String, Entry>>() {}.getType();
+            Map<String, Entry> loaded = GSON.fromJson(r, type);
+            if (loaded != null) cauldrons = new HashMap<>(loaded);
+        } catch (IOException e) {
+            LOGGER.error("Failed to load potion cauldron data", e);
+        } catch (RuntimeException e) {
+            // JsonSyntaxException / IllegalStateException：旧格式或损坏 → 起干净的
+            // 把旧文件挪成 .bak 保留证据，避免下次 save 直接覆写。
+            LOGGER.warn("Potion cauldron data is in a legacy or corrupted format ({}), " +
+                "starting fresh. Backup saved as .bak.", e.getMessage());
+            try {
+                Files.move(dataFile, dataFile.resolveSibling(dataFile.getFileName() + ".bak"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException moveErr) {
+                LOGGER.error("Failed to back up bad cauldron data file", moveErr);
             }
         }
     }
