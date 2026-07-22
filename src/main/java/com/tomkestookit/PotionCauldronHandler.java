@@ -1,5 +1,6 @@
 package com.tomkestookit;
 
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -45,6 +46,15 @@ public final class PotionCauldronHandler {
 
     public static void register() {
         UseBlockCallback.EVENT.register(PotionCauldronHandler::onUseBlock);
+        // 玩家破坏药水锅 → 清标签 + 清 tracker
+        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, be) -> {
+            if (!(world instanceof ServerWorld sw)) return;
+            if (state.getBlock() != Blocks.WATER_CAULDRON && state.getBlock() != Blocks.CAULDRON) return;
+            String key = PotionCauldronTracker.key(sw.getRegistryKey().getValue().toString(), pos);
+            if (!PotionCauldronTracker.has(key)) return;
+            PotionCauldronLabel.removeLabel(sw, key);
+            PotionCauldronTracker.remove(key);
+        });
     }
 
     private static ActionResult onUseBlock(PlayerEntity player, net.minecraft.world.World world,
@@ -100,7 +110,7 @@ public final class PotionCauldronHandler {
                                                 BlockPos pos, String key, boolean isPotionCauldron) {
         // 如果已经是药水锅但装的药水不同，禁止混装（避免 NBT 突变）
         if (isPotionCauldron) {
-            NbtCompound stored = PotionCauldronTracker.get(key);
+            NbtCompound stored = PotionCauldronTracker.getPotion(key);
             if (stored != null && !samePotion(stored, potionNbt(held))) {
                 player.sendMessage(net.minecraft.text.Text.literal(
                     "炼药锅已装有不同药水，请先清空。").formatted(net.minecraft.util.Formatting.YELLOW), true);
@@ -113,11 +123,14 @@ public final class PotionCauldronHandler {
         }
 
         NbtCompound nbt = potionNbt(held);
-        PotionCauldronTracker.set(key, nbt);
+        PotionCauldronTracker.setPotion(key, nbt);
 
         // 视觉：设为满水锅（level 3）
         world.setBlockState(pos, Blocks.WATER_CAULDRON.getDefaultState()
             .with(LeveledCauldronBlock.LEVEL, 3), Block.NOTIFY_ALL);
+
+        // 悬浮字（新建或更新）
+        PotionCauldronLabel.ensureLabel(world, pos, key, nbt, 3);
 
         // 替换玩家手中：药水 → 玻璃瓶
         if (!player.getAbilities().creativeMode) {
@@ -142,7 +155,7 @@ public final class PotionCauldronHandler {
         int level = state.get(LeveledCauldronBlock.LEVEL);
         if (level <= 0) return ActionResult.PASS;
 
-        NbtCompound stored = PotionCauldronTracker.get(key);
+        NbtCompound stored = PotionCauldronTracker.getPotion(key);
         if (stored == null) return ActionResult.PASS;
 
         int toConvert = Math.min(held.getCount(), ARROWS_PER_LEVEL);
@@ -155,13 +168,15 @@ public final class PotionCauldronHandler {
             player.dropItem(tipped, false);
         }
 
-        // 水位 -1，归零时清空
+        // 水位 -1，归零时清空 + 移除标签
         int newLevel = level - 1;
         if (newLevel <= 0) {
             world.setBlockState(pos, Blocks.CAULDRON.getDefaultState(), Block.NOTIFY_ALL);
+            PotionCauldronLabel.removeLabel(world, key);
             PotionCauldronTracker.remove(key);
         } else {
             world.setBlockState(pos, state.with(LeveledCauldronBlock.LEVEL, newLevel), Block.NOTIFY_ALL);
+            PotionCauldronLabel.ensureLabel(world, pos, key, stored, newLevel);
         }
 
         world.playSound(null, pos, SoundEvents.BLOCK_BREWING_STAND_BREW, SoundCategory.BLOCKS, 0.8f, 1.0f);
@@ -176,7 +191,7 @@ public final class PotionCauldronHandler {
         int level = state.get(LeveledCauldronBlock.LEVEL);
         if (level <= 0) return ActionResult.PASS;
 
-        NbtCompound stored = PotionCauldronTracker.get(key);
+        NbtCompound stored = PotionCauldronTracker.getPotion(key);
         if (stored == null) return ActionResult.PASS;
 
         ItemStack potion = new ItemStack(Items.POTION);
@@ -193,9 +208,11 @@ public final class PotionCauldronHandler {
         int newLevel = level - 1;
         if (newLevel <= 0) {
             world.setBlockState(pos, Blocks.CAULDRON.getDefaultState(), Block.NOTIFY_ALL);
+            PotionCauldronLabel.removeLabel(world, key);
             PotionCauldronTracker.remove(key);
         } else {
             world.setBlockState(pos, state.with(LeveledCauldronBlock.LEVEL, newLevel), Block.NOTIFY_ALL);
+            PotionCauldronLabel.ensureLabel(world, pos, key, stored, newLevel);
         }
 
         world.playSound(null, pos, SoundEvents.ITEM_BOTTLE_FILL, SoundCategory.BLOCKS, 1.0f, 1.0f);

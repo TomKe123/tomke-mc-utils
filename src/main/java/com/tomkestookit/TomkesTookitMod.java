@@ -45,6 +45,7 @@ public class TomkesTookitMod implements ModInitializer {
             DeathLocationTracker.load(server);
             EntityCaptureTracker.load(server);
             PotionCauldronTracker.load(server);
+            PotionCauldronLabel.cleanupOrphans(server);
             LOGGER.info("TomkesTookit loaded.");
         });
 
