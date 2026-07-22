@@ -1,5 +1,6 @@
 package com.tomkestookit;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -34,7 +35,18 @@ import java.util.UUID;
  */
 public final class PotionCauldronLabel {
 
+    /** 周期扫尾间隔（tick）。5 分钟一次。*/
+    private static final int CLEANUP_INTERVAL_TICKS = 20 * 60 * 5;
+
     private PotionCauldronLabel() {}
+
+    /** 注册周期性孤儿清理。启动时 cleanupOrphans 由主类直接调，运行时靠这个 tick 兜底。*/
+    public static void register() {
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (server.getTicks() % CLEANUP_INTERVAL_TICKS != 0) return;
+            cleanupOrphans(server);
+        });
+    }
 
     /**
      * 保证 pos 处有一个和 tracker 匹配的标签实体（不存在则创建）。

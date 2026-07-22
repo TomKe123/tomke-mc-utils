@@ -35,6 +35,7 @@ public class TomkesTookitMod implements ModInitializer {
         LandmarkCommand.register();
         BackCommand.register();
         PotionCauldronHandler.register();
+        PotionCauldronLabel.register();
         Sidebar.register();
         TabHealth.register();
 
