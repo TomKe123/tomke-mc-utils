@@ -135,29 +135,58 @@ public final class PotionCauldronLabel {
         return nbt;
     }
 
-    /** 生成显示文本：药水名（含时长）+ 剩余层数。*/
-    private static Text buildText(NbtCompound potionNbt, int level) {
-        MutableText line1 = potionName(potionNbt);
-        MutableText line2 = Text.literal("剩余 " + level + " 层").formatted(Formatting.GRAY);
-        return Text.empty()
-            .append(line1)
-            .append(Text.literal("\n"))
-            .append(line2);
-    }
-
     /**
-     * 从存储的 NBT 反推药水显示名（含时长/等级）。
-     * 优先用 vanilla PotionUtil.buildTooltip 一样的效果，但我们需要文本形式。
+     * 生成显示文本：多效果时逐行列出，末尾一行是剩余层数。
+     *   力量 II (3:00)
+     *   跳跃提升 (1:30)
+     *   剩余 2 层
      */
-    private static MutableText potionName(NbtCompound potionNbt) {
-        // 用 vanilla Potion 注册表拿到药水基础名字，然后附加等级/时长
-        Potion potion = PotionUtil.getPotion(potionNbt);
+    private static Text buildText(NbtCompound potionNbt, int level) {
         List<net.minecraft.entity.effect.StatusEffectInstance> effects =
             PotionUtil.getPotionEffects(potionNbt);
 
+        MutableText result = Text.empty();
+        if (effects.isEmpty()) {
+            // 无 effect：可能是纯水（未定义效果的药水）
+            result.append(Text.literal("水").formatted(Formatting.AQUA));
+        } else if (effects.size() == 1) {
+            // 单效果：优先用 base Potion 名（"力量药水"）而非效果名（"力量"）
+            result.append(potionName(potionNbt, effects.get(0)));
+        } else {
+            // 多效果：逐个列 effect 名 + 时长
+            for (int i = 0; i < effects.size(); i++) {
+                if (i > 0) result.append(Text.literal("\n"));
+                result.append(effectLine(effects.get(i)));
+            }
+        }
+        result.append(Text.literal("\n"))
+            .append(Text.literal("剩余 " + level + " 层").formatted(Formatting.GRAY));
+        return result;
+    }
+
+    /** 单效果行：效果名 + 强度 + 时长。*/
+    private static MutableText effectLine(net.minecraft.entity.effect.StatusEffectInstance eff) {
+        MutableText line = Text.translatable(eff.getTranslationKey())
+            .formatted(eff.getEffectType().getCategory().getFormatting());
+        if (eff.getAmplifier() > 0) {
+            line.append(" ").append(Text.translatable("potion.potency." + eff.getAmplifier()));
+        }
+        int dur = eff.getDuration();
+        if (dur > 20) {
+            line.append(Text.literal(" (" + formatDuration(dur) + ")").formatted(Formatting.GRAY));
+        }
+        return line;
+    }
+
+    /**
+     * 单效果药水的显示名：有 base Potion 用配方名（"力量药水"），否则退回效果名。
+     * 尾部附加时长。
+     */
+    private static MutableText potionName(NbtCompound potionNbt,
+                                          net.minecraft.entity.effect.StatusEffectInstance eff) {
+        Potion potion = PotionUtil.getPotion(potionNbt);
         MutableText name;
         if (potion != null && potion != Registries.POTION.get(Registries.POTION.getDefaultId())) {
-            // 有基础药水类型：用它的翻译 key
             var id = Registries.POTION.getId(potion);
             if (id != null) {
                 name = Text.translatable("item.minecraft.potion.effect." + id.getPath())
@@ -165,25 +194,18 @@ public final class PotionCauldronLabel {
             } else {
                 name = Text.literal("药水").formatted(Formatting.LIGHT_PURPLE);
             }
-        } else if (!effects.isEmpty()) {
-            var eff = effects.get(0);
-            MutableText effName = Text.translatable(eff.getTranslationKey())
+        } else {
+            // 无 base Potion：用效果名 + 强度
+            name = Text.translatable(eff.getTranslationKey())
                 .formatted(eff.getEffectType().getCategory().getFormatting());
             if (eff.getAmplifier() > 0) {
-                effName.append(" ").append(Text.translatable(
+                name.append(" ").append(Text.translatable(
                     "potion.potency." + eff.getAmplifier()));
             }
-            name = effName;
-        } else {
-            name = Text.literal("水").formatted(Formatting.AQUA);
         }
-
-        // 附加时长（若有 effect）
-        if (!effects.isEmpty()) {
-            int dur = effects.get(0).getDuration();
-            if (dur > 20) {
-                name.append(Text.literal(" (" + formatDuration(dur) + ")").formatted(Formatting.GRAY));
-            }
+        int dur = eff.getDuration();
+        if (dur > 20) {
+            name.append(Text.literal(" (" + formatDuration(dur) + ")").formatted(Formatting.GRAY));
         }
         return name;
     }

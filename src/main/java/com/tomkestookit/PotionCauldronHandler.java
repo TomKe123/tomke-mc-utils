@@ -7,6 +7,8 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.LeveledCauldronBlock;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.effect.StatusEffect;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
@@ -19,6 +21,11 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 炼药锅装药水 + 箭浸药水做药水箭。
@@ -108,15 +115,6 @@ public final class PotionCauldronHandler {
     private static ActionResult fillWithPotion(ServerPlayerEntity player, ServerWorld world,
                                                 Hand hand, ItemStack held, BlockState state,
                                                 BlockPos pos, String key, boolean isPotionCauldron) {
-        // 如果已经是药水锅但装的药水不同，禁止混装（避免 NBT 突变）
-        if (isPotionCauldron) {
-            NbtCompound stored = PotionCauldronTracker.getPotion(key);
-            if (stored != null && !samePotion(stored, potionNbt(held))) {
-                player.sendMessage(net.minecraft.text.Text.literal(
-                    "炼药锅已装有不同药水，请先清空。").formatted(net.minecraft.util.Formatting.YELLOW), true);
-                return ActionResult.SUCCESS; // 消费点击避免落到 vanilla
-            }
-        }
         // 如果是普通水锅（不在 tracker）而且不空，则不覆盖——避免抢 vanilla 的水锅行为
         if (state.getBlock() == Blocks.WATER_CAULDRON && !isPotionCauldron) {
             return ActionResult.PASS;
@@ -131,7 +129,15 @@ public final class PotionCauldronHandler {
         }
         int newLevel = currentLevel + 1;
 
-        NbtCompound nbt = potionNbt(held);
+        // 合并：如果已是药水锅，把新药水的 effects 与已有的合并；否则直接用新药水的 NBT
+        NbtCompound incoming = potionNbt(held);
+        NbtCompound nbt;
+        if (isPotionCauldron) {
+            NbtCompound stored = PotionCauldronTracker.getPotion(key);
+            nbt = (stored != null) ? mergePotionNbt(stored, incoming) : incoming;
+        } else {
+            nbt = incoming;
+        }
         PotionCauldronTracker.setPotion(key, nbt);
 
         // 视觉：升到 newLevel（一瓶一层）
@@ -265,7 +271,43 @@ public final class PotionCauldronHandler {
         }
     }
 
-    private static boolean samePotion(NbtCompound a, NbtCompound b) {
-        return a.toString().equals(b.toString());
+    /**
+     * 合并两份药水 NBT：
+     *   - 用 PotionUtil.getPotionEffects 分别解析出效果列表（base Potion + CustomPotionEffects 一起归并）
+     *   - 拼接后按 StatusEffect 类型去重：相同类型保留 amplifier 更高的；amplifier 相同则保留剩余时间更长的
+     *   - 结果 NBT 只写 CustomPotionEffects（无 base Potion）——合并后没有单一"配方标识"，用 CustomPotionEffects 表达最贴近
+     *   - 颜色让 vanilla 自己从 effect 列表算，不显式指定
+     */
+    private static NbtCompound mergePotionNbt(NbtCompound a, NbtCompound b) {
+        List<StatusEffectInstance> merged = new ArrayList<>();
+        for (StatusEffectInstance e : PotionUtil.getPotionEffects(a)) merged.add(new StatusEffectInstance(e));
+        for (StatusEffectInstance e : PotionUtil.getPotionEffects(b)) merged.add(new StatusEffectInstance(e));
+
+        // 按 StatusEffect 类型去重：留 amplifier 更高 / duration 更长的
+        Map<StatusEffect, StatusEffectInstance> dedup = new LinkedHashMap<>();
+        for (StatusEffectInstance eff : merged) {
+            StatusEffectInstance old = dedup.get(eff.getEffectType());
+            if (old == null || strongerThan(eff, old)) {
+                dedup.put(eff.getEffectType(), eff);
+            }
+        }
+
+        // 用 vanilla 的 setCustomPotionEffects 打包到临时 ItemStack，再抽 NBT
+        ItemStack tmp = new ItemStack(Items.POTION);
+        PotionUtil.setCustomPotionEffects(tmp, dedup.values());
+        NbtCompound out = tmp.getOrCreateNbt();
+        // 剥离与药水身份无关的 vanilla 附加字段（保留 Potion / CustomPotionEffects / CustomPotionColor）
+        NbtCompound clean = new NbtCompound();
+        if (out.contains(PotionUtil.CUSTOM_POTION_EFFECTS_KEY)) {
+            clean.put(PotionUtil.CUSTOM_POTION_EFFECTS_KEY,
+                out.getList(PotionUtil.CUSTOM_POTION_EFFECTS_KEY, 10).copy());
+        }
+        return clean;
+    }
+
+    /** 判 a 是否比 b "更强"：先比 amplifier，再比 duration。*/
+    private static boolean strongerThan(StatusEffectInstance a, StatusEffectInstance b) {
+        if (a.getAmplifier() != b.getAmplifier()) return a.getAmplifier() > b.getAmplifier();
+        return a.getDuration() > b.getDuration();
     }
 }
