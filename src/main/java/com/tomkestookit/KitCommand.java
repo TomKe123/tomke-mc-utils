@@ -90,6 +90,14 @@ public class KitCommand {
                                     .formatted(Formatting.YELLOW), false);
                                 return cnt;
                             })))
+                    .then(CommandManager.literal("admin")
+                        .requires(src -> src.hasPermissionLevel(2))
+                        .executes(ctx -> {
+                            try {
+                                com.tomkestookit.menu.AdminPanelMenu.open(ctx.getSource().getPlayerOrThrow());
+                                return 1;
+                            } catch (Exception e) { return 0; }
+                        }))
             ));
     }
 
@@ -153,9 +161,5 @@ public class KitCommand {
             new ItemStack(Items.BREAD, 16),
             MenuClock.create()
         );
-
-        for (ItemStack item : items) {
-            player.getInventory().insertStack(item);
-        }
     }
 }

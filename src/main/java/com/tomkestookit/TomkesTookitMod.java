@@ -21,6 +21,16 @@ public class TomkesTookitMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // 给 admin 面板做管理员 kit 定制用；须在 KitCommand.register 之前调，
+        // 保证 config 首次 load 时能拿到默认 kit 兜底。
+        TomkesTookitConfig.registerDefaultKit(KitCommand::buildDefaultKit);
+
+        // 特性从"开"翻到"关"时的清理回调（server 可能为 null，处理方各自判空）
+        TomkesTookitConfig.registerTearDown("world.afk", AfkDisplay::flushAll);
+        TomkesTookitConfig.registerTearDown("ui.sidebar", Sidebar::uninstall);
+        TomkesTookitConfig.registerTearDown("cmd.fly", FlyCommand::disableAll);
+        TomkesTookitConfig.registerTearDown("world.bot_anchor", s -> BotAnchorTracker.clearAll());
+
         KitCommand.register();
         AntigravBootsHandler.register();
         CommandPermission.register();

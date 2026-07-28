@@ -98,6 +98,17 @@ public final class MenuUi {
         inv.setStack(46, specialRecipeButton());
         actions.put(46, RecipeMenu::openSpecial);
 
+        // 管理员面板入口（仅 OP 可见；非 OP 该槽会被 fillBackground 用玻璃板遮住）
+        if (player.hasPermissionLevel(2)) {
+            inv.setStack(52, MenuButtons.button(Items.COMMAND_BLOCK,
+                "§c§l管理员面板",
+                List.of("§7逐项开关 mod 功能",
+                    "§7自定义新手礼包",
+                    "",
+                    "§eOP only")));
+            actions.put(52, AdminPanelMenu::open);
+        }
+
         // 关闭按钮
         inv.setStack(53, MenuButtons.closeButton());
         actions.put(53, ServerPlayerEntity::closeHandledScreen);

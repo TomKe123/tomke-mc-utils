@@ -36,6 +36,15 @@ public final class Sidebar {
         });
     }
 
+    /** 管理员关掉 ui.sidebar 时的清理：把 SIDEBAR 上的 objective 卸掉。*/
+    public static void uninstall(MinecraftServer server) {
+        if (server == null) return;
+        ServerScoreboard board = server.getScoreboard();
+        ScoreboardObjective existing = board.getNullableObjective(OBJECTIVE_ID);
+        if (existing != null) board.removeObjective(existing);
+        objective = null;
+    }
+
     private static void install(MinecraftServer server) {
         ServerScoreboard board = server.getScoreboard();
         // 移除旧版本残留（同名 objective）

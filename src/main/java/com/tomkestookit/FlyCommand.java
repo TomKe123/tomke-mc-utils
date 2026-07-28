@@ -210,4 +210,15 @@ public final class FlyCommand {
         disableFly(player);
         player.sendMessage(Text.literal(reason).formatted(Formatting.RED), false);
     }
+
+    /** 管理员关掉 cmd.fly 时的清理：把所有启用 fly 的玩家还原。*/
+    public static void disableAll(net.minecraft.server.MinecraftServer server) {
+        if (server == null || XP_DEBT.isEmpty()) return;
+        for (ServerPlayerEntity p : new java.util.ArrayList<>(server.getPlayerManager().getPlayerList())) {
+            if (XP_DEBT.remove(p.getUuid()) != null) {
+                disableFly(p);
+            }
+        }
+        XP_DEBT.clear();
+    }
 }

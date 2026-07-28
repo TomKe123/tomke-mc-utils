@@ -114,4 +114,13 @@ public final class BotAnchorTracker {
         ATTACK_INTERVALS.remove(bot);
         ATTACK_TICKERS.remove(bot);
     }
+
+    /** 管理员关掉 world.bot_anchor 时的清理：清所有 tracker 状态。*/
+    public static void clearAll() {
+        ANCHORS.clear();
+        KNOCKBACK_OFF_EXPLICIT.clear();
+        TARGET_MODES.clear();
+        ATTACK_INTERVALS.clear();
+        ATTACK_TICKERS.clear();
+    }
 }
