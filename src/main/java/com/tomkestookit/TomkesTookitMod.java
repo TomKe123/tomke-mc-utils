@@ -52,6 +52,7 @@ public class TomkesTookitMod implements ModInitializer {
         AfkDisplay.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            TomkesTookitConfig.load(server);
             KitTracker.load(server);
             LandmarkStore.load(server);
             VeinMineTracker.load(server);

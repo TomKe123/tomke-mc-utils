@@ -116,8 +116,20 @@ public class KitCommand {
     /**
      * 只发放物品，不做已领取校验、不更新 tracker、不发消息。
      * 供菜单等其他入口在完成自己的校验后调用。
+     *
+     * 物品清单来自 {@link TomkesTookitConfig#kitItems()}；未定制时回落到 {@link #buildDefaultKit()}。
      */
     public static void giveKitItems(ServerPlayerEntity player) {
+        for (ItemStack item : TomkesTookitConfig.kitItems()) {
+            player.getInventory().insertStack(item);
+        }
+    }
+
+    /**
+     * 默认新手礼包内容。仅在 config 未定制过时生效；管理员通过面板改动后就走 config 里的清单。
+     * 也是"重置默认"按钮的数据源。
+     */
+    public static List<ItemStack> buildDefaultKit() {
         // 反重力皮靴
         ItemStack boots = new ItemStack(Items.LEATHER_BOOTS);
         boots.setCustomName(Text.literal("反重力皮靴").formatted(Formatting.RED));
@@ -131,7 +143,7 @@ public class KitCommand {
         display.putInt("color", 0xFF0000);
         nbt.put("display", display);
 
-        List<ItemStack> items = List.of(
+        return List.of(
             boots,
             new ItemStack(Items.LEATHER_HELMET),
             new ItemStack(Items.LEATHER_CHESTPLATE),
