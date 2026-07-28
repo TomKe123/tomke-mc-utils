@@ -30,12 +30,10 @@ public final class BackCommand {
     private BackCommand() {}
 
     public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 CommandManager.literal("back")
                     .executes(BackCommand::execute)
-            );
-        });
+            ));
 
         // 死亡时记录位置。ServerLivingEntityEvents.AFTER_DEATH 只在服务端触发，
         // 拿到的 living 已经被判定死亡但还没重生，getPos/getWorld 都是死亡瞬间的值。
@@ -62,7 +60,7 @@ public final class BackCommand {
         DeathLocationTracker.DeathLocation loc = DeathLocationTracker.get(player.getUuid());
         if (loc == null) return;
 
-        String dim = shortDim(loc.dimension);
+        String dim = com.tomkestookit.landmark.LandmarkCommand.dimShort(loc.dimension);
         Text hover = Text.literal("§7返回死亡地点\n§f" + fmt(loc.x) + " " + fmt(loc.y) + " " + fmt(loc.z) + " §7@ §f" + dim);
 
         Text message = Text.empty()
@@ -113,6 +111,7 @@ public final class BackCommand {
             return false;
         }
         player.teleport(target, loc.x, loc.y, loc.z, loc.yaw, loc.pitch);
+        SpawnProtection.grant(player, "返回死亡地点");
         player.sendMessage(Text.literal("已返回死亡地点").formatted(Formatting.GREEN), true);
         return true;
     }
@@ -121,10 +120,4 @@ public final class BackCommand {
         return String.valueOf((int) Math.floor(v));
     }
 
-    private static String shortDim(String key) {
-        if ("minecraft:overworld".equals(key)) return "主世界";
-        if ("minecraft:the_nether".equals(key)) return "下界";
-        if ("minecraft:the_end".equals(key)) return "末地";
-        return key;
-    }
 }

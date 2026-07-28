@@ -31,6 +31,15 @@ public class TomkesTookitMod implements ModInitializer {
         KillPermission.register();
         VeinMineCommand.register();
         VeinMineHandler.register();
+        com.tomkestookit.regionclearer.RegionClearerHandler.register();
+        com.tomkestookit.regionfiller.RegionFillerHandler.register();
+        SignCommandHandler.register();
+        BotInteractHandler.register();
+        BotAnchorHandler.register();
+        com.tomkestookit.menu.BotMenuTracker.register();
+        com.tomkestookit.logistics.LogisticsHandler.register();
+        AutoCrafterHandler.register();
+        ShulkerBoxHandler.register();
         MenuClock.register();
         LandmarkCommand.register();
         BackCommand.register();
@@ -38,21 +47,35 @@ public class TomkesTookitMod implements ModInitializer {
         PotionCauldronLabel.register();
         Sidebar.register();
         TabHealth.register();
+        SpawnProtection.register();
+        SugarTntHandler.register();
+        AfkDisplay.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             KitTracker.load(server);
             LandmarkStore.load(server);
             VeinMineTracker.load(server);
+            VeinMineBlockConfig.load(server);
             DeathLocationTracker.load(server);
             EntityCaptureTracker.load(server);
             PotionCauldronTracker.load(server);
-            PotionCauldronLabel.cleanupOrphans(server);
+            AutoCrafterTracker.load(server);
+            PotionCauldronLabel.cleanupLoadedOrphans(server);
+            com.tomkestookit.logistics.LogisticsTracker.load(server);
+            // 启动时清一次孤儿：只对已加载 chunk 生效；未加载 chunk 里的 marker
+            // 会在 chunk 加载后由 tick sweep 兜底处理。
+            int cleaned = com.tomkestookit.logistics.LogisticsHandler.sweepOrphans(server);
+            int cleanedCrafters = AutoCrafterHandler.sweepOrphans(server);
+            if (cleaned > 0) {
+                LOGGER.info("[TomkesTookit] 启动时清理 {} 个孤儿物流终端盔甲架。", cleaned);
+            }
+            if (cleanedCrafters > 0) {
+                LOGGER.info("[TomkesTookit] 启动时清理 {} 个孤儿自动合成器盔甲架。", cleanedCrafters);
+            }
             LOGGER.info("TomkesTookit loaded.");
         });
 
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            sendKitMessage(handler.player);
-        });
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendKitMessage(handler.player));
     }
 
     public static void sendKitMessage(ServerPlayerEntity player) {

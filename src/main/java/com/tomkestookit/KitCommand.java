@@ -1,7 +1,10 @@
 package com.tomkestookit;
 
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.tomkestookit.menu.MenuClock;
+import com.tomkestookit.regionclearer.RegionClearerHandler;
+import com.tomkestookit.regionfiller.RegionFillerHandler;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -17,14 +20,77 @@ import java.util.List;
 public class KitCommand {
 
     public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 CommandManager.literal("tomkestookit")
+                    .requires(src -> true)
                     .then(CommandManager.literal("give")
-                        .executes(KitCommand::giveKit)
-                    )
-            );
-        });
+                        .executes(KitCommand::giveKit))
+                    .then(CommandManager.literal("regionclearer")
+                        .requires(src -> true)
+                        .then(CommandManager.literal("confirm")
+                            .executes(ctx -> {
+                                try {
+                                    return RegionClearerHandler.confirm(ctx.getSource().getPlayerOrThrow());
+                                } catch (Exception e) { return 0; }
+                            }))
+                        .then(CommandManager.literal("cancel")
+                            .executes(ctx -> {
+                                try {
+                                    return RegionClearerHandler.cancel(ctx.getSource().getPlayerOrThrow());
+                                } catch (Exception e) { return 0; }
+                            })))
+                    .then(CommandManager.literal("regionfiller")
+                        .requires(src -> true)
+                        .then(CommandManager.literal("confirm")
+                            .executes(ctx -> {
+                                try {
+                                    return RegionFillerHandler.confirm(ctx.getSource().getPlayerOrThrow());
+                                } catch (Exception e) { return 0; }
+                            }))
+                        .then(CommandManager.literal("cancel")
+                            .executes(ctx -> {
+                                try {
+                                    return RegionFillerHandler.cancel(ctx.getSource().getPlayerOrThrow());
+                                } catch (Exception e) { return 0; }
+                            })))
+                    .then(CommandManager.literal("invaccept")
+                        .then(CommandManager.argument("id", StringArgumentType.word())
+                            .executes(ctx -> {
+                                try {
+                                    return PlayerInventoryAccessRequest.accept(ctx.getSource().getPlayerOrThrow(),
+                                        StringArgumentType.getString(ctx, "id"));
+                                } catch (Exception e) { return 0; }
+                            })))
+                    .then(CommandManager.literal("invdeny")
+                        .then(CommandManager.argument("id", StringArgumentType.word())
+                            .executes(ctx -> {
+                                try {
+                                    return PlayerInventoryAccessRequest.deny(ctx.getSource().getPlayerOrThrow(),
+                                        StringArgumentType.getString(ctx, "id"));
+                                } catch (Exception e) { return 0; }
+                            })))
+                    .then(CommandManager.literal("autocrafter")
+                        .requires(src -> src.hasPermissionLevel(2))
+                        .then(CommandManager.literal("give")
+                            .executes(ctx -> {
+                                try {
+                                    ctx.getSource().getPlayerOrThrow().getInventory().insertStack(AutoCrafterHandler.buildItem());
+                                    return 1;
+                                } catch (Exception e) { return 0; }
+                            })))
+                    .then(CommandManager.literal("logistics")
+                        .requires(src -> src.hasPermissionLevel(2))
+                        .then(CommandManager.literal("cleanup")
+                            .executes(ctx -> {
+                                int n = com.tomkestookit.logistics.LogisticsHandler
+                                    .sweepOrphans(ctx.getSource().getServer());
+                                final int cnt = n;
+                                ctx.getSource().sendFeedback(() -> Text.literal(
+                                    "已清理 " + cnt + " 个孤儿物流终端盔甲架。")
+                                    .formatted(Formatting.YELLOW), false);
+                                return cnt;
+                            })))
+            ));
     }
 
     private static int giveKit(CommandContext<ServerCommandSource> ctx) {

@@ -75,12 +75,11 @@ public final class MenuButtons {
         List<String> lore = new ArrayList<>();
         lore.add("§7第 " + (page + 1) + " / " + Math.max(1, total) + " 页");
         if (!enabled) lore.add("§8已到边界");
-        ItemStack stack = button(
+        return button(
             enabled ? Items.SPECTRAL_ARROW : Items.ARROW,
-            (c.toString()) + (next ? label + " " + arrow : arrow + " " + label),
+            c + (next ? label + " " + arrow : arrow + " " + label),
             lore
         );
-        return stack;
     }
 
     /** 通用按钮：物品 + 无斜体名字 + lore。*/

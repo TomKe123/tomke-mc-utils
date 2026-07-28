@@ -45,7 +45,8 @@ public final class RecipeMenu {
 
     private enum Tab {
         CRAFTING("合成", Items.CRAFTING_TABLE),
-        STONECUTTING("切石", Items.STONECUTTER);
+        STONECUTTING("切石", Items.STONECUTTER),
+        SPECIAL("特殊", Items.NETHER_STAR);
 
         final String label;
         final net.minecraft.item.Item icon;
@@ -62,11 +63,12 @@ public final class RecipeMenu {
         open(viewer, Tab.CRAFTING, 0);
     }
 
-    public static void open(ServerPlayerEntity viewer, Tab tab, int page) {
-        List<Recipe<?>> list = collect(viewer.getServer(), tab);
-        int totalPages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        page = Math.max(0, Math.min(page, totalPages - 1));
+    /** 直接跳到"魔改配方"tab。给主菜单入口用。*/
+    public static void openSpecial(ServerPlayerEntity viewer) {
+        open(viewer, Tab.SPECIAL, 0);
+    }
 
+    private static void open(ServerPlayerEntity viewer, Tab tab, int page) {
         Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
@@ -77,22 +79,17 @@ public final class RecipeMenu {
         inv.setStack(1, tabButton(Tab.STONECUTTING,
             countOf(viewer.getServer(), Tab.STONECUTTING), tab == Tab.STONECUTTING));
         actions.put(1, p -> open(p, Tab.STONECUTTING, 0));
+        inv.setStack(2, tabButton(Tab.SPECIAL,
+            SpecialRecipeCatalog.all().size(), tab == Tab.SPECIAL));
+        actions.put(2, p -> open(p, Tab.SPECIAL, 0));
 
-        // 页内容
-        if (list.isEmpty()) {
-            inv.setStack(22, MenuButtons.button(Items.PAPER, "§7暂无配方",
-                List.of("§8该类型没有本包配方")));
+        int totalPages;
+        if (tab == Tab.SPECIAL) {
+            totalPages = renderSpecialTab(viewer, inv, actions, page);
         } else {
-            int start = page * PAGE_SIZE;
-            int end = Math.min(start + PAGE_SIZE, list.size());
-            DynamicRegistryManager drm = viewer.getServer().getRegistryManager();
-            for (int i = start; i < end; i++) {
-                Recipe<?> recipe = list.get(i);
-                int slot = FIRST_SLOT + (i - start);
-                inv.setStack(slot, recipeIcon(recipe, drm));
-                // 无 action：只展示
-            }
+            totalPages = renderRecipeTab(viewer, inv, tab, page);
         }
+        page = Math.max(0, Math.min(page, totalPages - 1));
 
         // 分页 & 返回
         Tab tabRef = tab;
@@ -126,7 +123,9 @@ public final class RecipeMenu {
         RecipeType<?> type = switch (tab) {
             case CRAFTING -> RecipeType.CRAFTING;
             case STONECUTTING -> RecipeType.STONECUTTING;
+            default -> null;
         };
+        if (type == null) return List.of();
         List<Recipe<?>> result = new ArrayList<>();
         for (Recipe<?> r : server.getRecipeManager().values()) {
             if (!r.getType().equals(type)) continue;
@@ -139,7 +138,92 @@ public final class RecipeMenu {
     }
 
     private static int countOf(MinecraftServer server, Tab tab) {
+        if (tab == Tab.SPECIAL) return SpecialRecipeCatalog.all().size();
         return collect(server, tab).size();
+    }
+
+    /** 常规 tab 渲染到 inv，返回总页数。*/
+    private static int renderRecipeTab(ServerPlayerEntity viewer, Inventory inv, Tab tab, int page) {
+        List<Recipe<?>> list = collect(viewer.getServer(), tab);
+        int totalPages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        page = Math.max(0, Math.min(page, totalPages - 1));
+        if (list.isEmpty()) {
+            inv.setStack(22, MenuButtons.button(Items.PAPER, "§7暂无配方",
+                List.of("§8该类型没有本包配方")));
+            return totalPages;
+        }
+        int start = page * PAGE_SIZE;
+        int end = Math.min(start + PAGE_SIZE, list.size());
+        DynamicRegistryManager drm = viewer.getServer().getRegistryManager();
+        for (int i = start; i < end; i++) {
+            inv.setStack(FIRST_SLOT + (i - start), recipeIcon(list.get(i), drm));
+        }
+        return totalPages;
+    }
+
+    /** 特殊 tab 渲染到 inv，返回总页数。槽位可以点击打开详情。*/
+    private static int renderSpecialTab(ServerPlayerEntity viewer, Inventory inv,
+                                        Map<Integer, Consumer<ServerPlayerEntity>> actions, int page) {
+        List<SpecialRecipeEntry> list = SpecialRecipeCatalog.all();
+        int totalPages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        page = Math.max(0, Math.min(page, totalPages - 1));
+        int start = page * PAGE_SIZE;
+        int end = Math.min(start + PAGE_SIZE, list.size());
+        for (int i = start; i < end; i++) {
+            SpecialRecipeEntry entry = list.get(i);
+            int slot = FIRST_SLOT + (i - start);
+            inv.setStack(slot, buildSpecialIcon(entry));
+            final String key = entry.key();
+            actions.put(slot, p -> openSpecialDetail(p, key));
+        }
+        return totalPages;
+    }
+
+    private static ItemStack buildSpecialIcon(SpecialRecipeEntry entry) {
+        ItemStack icon = entry.resultSupplier().get().copy();
+        List<String> lore = new ArrayList<>();
+        lore.add("§7—— 3×3 合成图示 ——");
+        lore.addAll(entry.description());
+        lore.add("");
+        lore.add("§8点击查看详细做法");
+        applyLoreOverride(icon, "§d§l" + icon.getName().getString(), lore);
+        return icon;
+    }
+
+    /** special detail：把产物放中心 4，周围 3×3 显示配方，四角 lore 说明。*/
+    public static void openSpecialDetail(ServerPlayerEntity viewer, String key) {
+        SpecialRecipeEntry entry = null;
+        for (SpecialRecipeEntry e : SpecialRecipeCatalog.all()) {
+            if (e.key().equals(key)) { entry = e; break; }
+        }
+        if (entry == null) { open(viewer); return; }
+
+        Inventory inv = MenuScreenHandler.buildInventory(6);
+        Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
+
+        // 顶部：产物大图
+        ItemStack productDisplay = entry.resultSupplier().get().copy();
+        applyLoreOverride(productDisplay, "§d§l" + productDisplay.getName().getString(), entry.description());
+        inv.setStack(4, productDisplay);
+
+        // 中部 3×3 图示（位置 20-22 / 29-31 / 38-40）
+        int[] gridSlots = {20, 21, 22, 29, 30, 31, 38, 39, 40};
+        for (int i = 0; i < 9; i++) {
+            ItemStack g = entry.gridStack(i);
+            if (!g.isEmpty()) inv.setStack(gridSlots[i], g);
+        }
+
+        // 返回
+        inv.setStack(BACK_SLOT, MenuButtons.backButton());
+        SpecialRecipeEntry captured = entry;
+        actions.put(BACK_SLOT, p -> open(p, Tab.SPECIAL, 0));
+
+        MenuButtons.fillBackground(inv);
+
+        viewer.openHandledScreen(new SimpleNamedScreenHandlerFactory(
+            (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions),
+            Text.literal("§d§l§n" + captured.resultSupplier().get().getName().getString())
+        ));
     }
 
     // ------------------------------------------------------------------ items

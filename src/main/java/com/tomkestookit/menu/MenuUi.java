@@ -54,6 +54,7 @@ public final class MenuUi {
     public static void open(ServerPlayerEntity player) {
         Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
+        Map<Integer, Consumer<ServerPlayerEntity>> rightActions = new HashMap<>();
 
         // 顶部中央：玩家信息卡（不响应点击，仅展示）
         inv.setStack(4, playerInfoCard(player));
@@ -73,6 +74,7 @@ public final class MenuUi {
 
         inv.setStack(17, landmarkButton());
         actions.put(17, LandmarkMenu::open);
+        rightActions.put(17, p -> LandmarkMenu.promptAdd(p, "", 0));
 
         // 开关/浏览行 (row 4)：4 个横向均分按钮
         inv.setStack(37, flyButton(player));
@@ -80,12 +82,21 @@ public final class MenuUi {
 
         inv.setStack(39, veinMineButton(player));
         actions.put(39, MenuUi::toggleVeinMine);
+        rightActions.put(39, VeinMineMenu::open);
 
         inv.setStack(41, entityCaptureButton(player));
         actions.put(41, MenuUi::toggleEntityCapture);
 
         inv.setStack(43, recipeButton(player));
         actions.put(43, RecipeMenu::open);
+
+        // 帮助 / 说明按钮
+        inv.setStack(45, helpButton());
+        actions.put(45, HelpMenu::open);
+
+        // 魔改配方直达
+        inv.setStack(46, specialRecipeButton());
+        actions.put(46, RecipeMenu::openSpecial);
 
         // 关闭按钮
         inv.setStack(53, MenuButtons.closeButton());
@@ -97,12 +108,34 @@ public final class MenuUi {
         // 标题带玩家名
         Text title = Text.literal("§b§l§n" + player.getGameProfile().getName() + " 的菜单");
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions),
+            (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions, rightActions, null),
             title
         ));
     }
 
     // ------------------------------------------------------------------ buttons
+
+    private static ItemStack specialRecipeButton() {
+        int count = com.tomkestookit.menu.SpecialRecipeCatalog.all().size();
+        return MenuButtons.button(Items.NETHER_STAR, "§d§l魔改配方",
+            List.of(
+                "§7独门 3×3 合成，共 §f" + count + " §7条",
+                "§8贪婪之瓶 · 大伊万 · 面包精华",
+                "§8自动合成器 · 物流终端",
+                "§8区域清除斧 · 附魔水/岩浆桶",
+                "",
+                "§a▶ 点击查看做法"));
+    }
+
+    private static ItemStack helpButton() {
+        return MenuButtons.button(Items.KNOWLEDGE_BOOK, "§e§l帮助与说明",
+            List.of(
+                "§7点击查看：",
+                "§7· 所有功能玩法",
+                "§7· 特殊合成配方",
+                "§7· 快捷键与命令"
+            ));
+    }
 
     private static ItemStack playerInfoCard(ServerPlayerEntity player) {
         BlockPos pos = player.getBlockPos();
@@ -202,9 +235,9 @@ public final class MenuUi {
         int count = LandmarkStore.all().size();
         List<String> lore = List.of(
             "§7地标总数 §f" + count,
-            "§8/landmark add <名字>",
             "",
-            "§a▶ 点击浏览并传送"
+            "§a左键 §7→ 浏览并传送",
+            "§b右键 §7→ 在当前位置快捷添加"
         );
         return MenuButtons.button(Items.MAP, "§f§l服务器地标", lore);
     }
@@ -248,7 +281,9 @@ public final class MenuUi {
             "§7  斧砍自然树 §8→ §7整棵原木/大蘑菇",
             "§7  剪刀砍树叶 §8→ §7整片林冠",
             "§7  镐挖矿石 §8→ §7同类连片",
-            "§8上限 128 块，消耗耐久，附魔生效",
+            "§7  白名单方块 §8→ §7单次最多 32 块",
+            "§a左键切换 §8/ §b右键详细设置",
+            "§8指令：/veinmine blocks",
             "",
             "§a▶ 点击切换"
         );
@@ -276,6 +311,7 @@ public final class MenuUi {
         }
         float yaw = player.getSpawnAngle();
         player.teleport(target, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5, yaw, 0);
+        com.tomkestookit.SpawnProtection.grant(player, "返回出生点");
         player.sendMessage(Text.literal("已传送到出生点").formatted(Formatting.GREEN), true);
         player.closeHandledScreen();
     }
@@ -316,9 +352,6 @@ public final class MenuUi {
     // ------------------------------------------------------------------ helpers
 
     static String dimShort(String key) {
-        if ("minecraft:overworld".equals(key)) return "主世界";
-        if ("minecraft:the_nether".equals(key)) return "下界";
-        if ("minecraft:the_end".equals(key)) return "末地";
-        return key;
+        return com.tomkestookit.landmark.LandmarkCommand.dimShort(key);
     }
 }

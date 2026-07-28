@@ -31,8 +31,7 @@ public final class MenuClock {
     private MenuClock() {}
 
     public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 CommandManager.literal("cd")
                     .requires(source -> true)
                     .executes(ctx -> {
@@ -45,8 +44,7 @@ public final class MenuClock {
                         MenuUi.open(player);
                         return 1;
                     })
-            );
-        });
+            ));
 
         // 仅主手触发：副手拿时钟右键不打开菜单，交给 vanilla 走原版路径。
         //   主手事件 + 主手是时钟 → 打开菜单 + fail 主手事件；因为主手事件 fail
