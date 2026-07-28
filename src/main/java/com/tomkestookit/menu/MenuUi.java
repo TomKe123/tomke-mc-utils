@@ -98,6 +98,14 @@ public final class MenuUi {
         inv.setStack(46, specialRecipeButton());
         actions.put(46, RecipeMenu::openSpecial);
 
+        // 随身末影箱（受 item.portable_ender_chest 控制，关掉时按钮仍显示但点击后收到红色提示）
+        inv.setStack(48, enderChestButton());
+        actions.put(48, p -> com.tomkestookit.PortableWorkstations.openEnderChest(p));
+
+        // 随身工作台
+        inv.setStack(50, portableWorkbenchButton());
+        actions.put(50, p -> com.tomkestookit.PortableWorkstations.openCraftingTable(p));
+
         // 管理员面板入口（仅 OP 可见；非 OP 该槽会被 fillBackground 用玻璃板遮住）
         if (player.hasPermissionLevel(2)) {
             inv.setStack(52, MenuButtons.button(Items.COMMAND_BLOCK,
@@ -146,6 +154,18 @@ public final class MenuUi {
                 "§7· 特殊合成配方",
                 "§7· 快捷键与命令"
             ));
+    }
+
+    private static ItemStack enderChestButton() {
+        return MenuButtons.button(Items.ENDER_CHEST, "§5§l随身末影箱",
+            List.of("§7在任何地方打开你的末影箱",
+                "§8命令：§f/echest"));
+    }
+
+    private static ItemStack portableWorkbenchButton() {
+        return MenuButtons.button(Items.CARTOGRAPHY_TABLE, "§6§l随身工作台",
+            List.of("§7在任何地方打开 3×3 合成",
+                "§8命令：§f/crafting"));
     }
 
     private static ItemStack playerInfoCard(ServerPlayerEntity player) {

@@ -74,6 +74,8 @@ public final class AdminFeature {
         add("item.auto_crafter_ops",     "自动合成器运行",   Items.CRAFTING_TABLE,Group.ITEM, "tick 合成、开 UI、放置、破坏、漏斗对接");
         add("item.potion_cauldron",      "药水锅",           Items.CAULDRON,      Group.ITEM, "空/水锅装药水、浸箭、复用瓶子、顶上飘字");
         add("item.shulker_handheld",     "潜影盒手持打开",   Items.SHULKER_BOX,   Group.ITEM, "shift+右键手持潜影盒开 UI");
+        add("item.portable_ender_chest", "随身末影箱",       Items.ENDER_CHEST,   Group.ITEM, "/echest 或菜单按钮打开末影箱");
+        add("item.portable_workbench",   "随身工作台",       Items.CARTOGRAPHY_TABLE, Group.ITEM, "/crafting 或菜单按钮打开工作台");
         add("item.sign_command",         "告示牌绑命令",     Items.OAK_SIGN,      Group.ITEM, "shift+F 手持告示牌 → 聊天输入命令 → 放下即封");
         add("item.veinmine",             "连锁采集",         Items.DIAMOND_PICKAXE,Group.ITEM,"shift+挖 → BFS 连锁，补树苗");
         add("item.entity_capture",       "生物收纳",         Items.EGG,           Group.ITEM, "shift+右键生物装进对应刷怪蛋");
