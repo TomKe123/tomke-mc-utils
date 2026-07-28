@@ -45,6 +45,10 @@ public final class VeinMineCommand {
         } catch (Exception e) {
             return 0;
         }
+        if (!TomkesTookitConfig.enabled("cmd.veinmine_toggle")) {
+            player.sendMessage(Text.literal("§c[/veinmine] 该命令已被管理员禁用").formatted(Formatting.RED), false);
+            return 0;
+        }
         boolean now = VeinMineTracker.toggle(player.getUuid());
         player.sendMessage(now
             ? Text.literal("连锁采集已 §a开启§f（shift+左键：树/叶/矿最多128；白名单方块单次≤32）")

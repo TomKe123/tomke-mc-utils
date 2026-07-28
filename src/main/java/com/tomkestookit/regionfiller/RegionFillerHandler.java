@@ -109,6 +109,7 @@ public final class RegionFillerHandler {
                                               Hand hand, BlockPos pos,
                                               net.minecraft.util.math.Direction direction) {
         if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.region_filler_use")) return ActionResult.PASS;
         ItemStack tool = player.getMainHandStack();
         if (!RegionFiller.isTool(tool)) return ActionResult.PASS;
         if (!world.isClient && player instanceof ServerPlayerEntity sp) {
@@ -120,6 +121,7 @@ public final class RegionFillerHandler {
     private static ActionResult onUseBlock(PlayerEntity player, net.minecraft.world.World world,
                                            Hand hand, BlockHitResult hit) {
         if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.region_filler_use")) return ActionResult.PASS;
         ItemStack tool = player.getMainHandStack();
         if (!RegionFiller.isTool(tool)) return ActionResult.PASS;
         if (!world.isClient && player instanceof ServerPlayerEntity sp) {

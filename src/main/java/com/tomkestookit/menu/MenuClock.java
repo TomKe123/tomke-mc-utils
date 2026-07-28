@@ -41,6 +41,11 @@ public final class MenuClock {
                         } catch (Exception e) {
                             return 0;
                         }
+                        if (!com.tomkestookit.TomkesTookitConfig.enabled("cmd.menu")) {
+                            player.sendMessage(net.minecraft.text.Text.literal("§c[/cd] 菜单已被管理员禁用")
+                                .formatted(net.minecraft.util.Formatting.RED), false);
+                            return 0;
+                        }
                         MenuUi.open(player);
                         return 1;
                     })
@@ -59,6 +64,9 @@ public final class MenuClock {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
             if (!isMenuClock(player.getMainHandStack())) {
+                return TypedActionResult.pass(player.getMainHandStack());
+            }
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("cmd.menu")) {
                 return TypedActionResult.pass(player.getMainHandStack());
             }
             MenuUi.open(serverPlayer);

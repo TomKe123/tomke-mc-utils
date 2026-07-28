@@ -31,6 +31,7 @@ public final class Sidebar {
         ServerLifecycleEvents.SERVER_STARTED.register(Sidebar::install);
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % REFRESH_INTERVAL != 0) return;
+            if (!TomkesTookitConfig.enabled("ui.sidebar")) return;
             refresh(server);
         });
     }

@@ -38,6 +38,7 @@ public final class BackCommand {
         // 死亡时记录位置。ServerLivingEntityEvents.AFTER_DEATH 只在服务端触发，
         // 拿到的 living 已经被判定死亡但还没重生，getPos/getWorld 都是死亡瞬间的值。
         ServerLivingEntityEvents.AFTER_DEATH.register((living, damageSource) -> {
+            if (!TomkesTookitConfig.enabled("cmd.back")) return;
             if (!(living instanceof ServerPlayerEntity player)) return;
             DeathLocationTracker.DeathLocation loc = new DeathLocationTracker.DeathLocation(
                 player.getWorld().getRegistryKey().getValue().toString(),
@@ -50,6 +51,7 @@ public final class BackCommand {
         // 重生后（AFTER_RESPAWN，alive=false 表示因死亡重生而非跨维度传送）
         // 发一条可点击的返回死亡地点提示。
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+            if (!TomkesTookitConfig.enabled("cmd.back")) return;
             if (alive) return; // alive=true 是从末地返回主世界那种"活着重生"，不算死亡
             if (!DeathLocationTracker.has(newPlayer.getUuid())) return;
             sendDeathBackMessage(newPlayer);
@@ -84,6 +86,10 @@ public final class BackCommand {
         try {
             player = src.getPlayerOrThrow();
         } catch (Exception e) {
+            return 0;
+        }
+        if (!TomkesTookitConfig.enabled("cmd.back")) {
+            player.sendMessage(Text.literal("§c[/back] 该功能已被管理员禁用").formatted(Formatting.RED), false);
             return 0;
         }
         return teleportToDeath(player) ? 1 : 0;

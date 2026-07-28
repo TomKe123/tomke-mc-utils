@@ -28,6 +28,7 @@ public abstract class SugarTntPowerMixin {
         try {
             //noinspection DataFlowIssue -- mixin 标准写法，运行时 this 就是 TntEntity 实例
             TntEntity self = (TntEntity) (Object) this;
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("item.sugar_tnt_boom")) return;
             if (!SugarTntHandler.isSugarTntEntity(self)) return;
             World world = self.getWorld();
             // vanilla 是 4.0f；我们放大 4 倍 = 16.0f

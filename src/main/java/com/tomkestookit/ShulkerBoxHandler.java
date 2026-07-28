@@ -49,6 +49,7 @@ public final class ShulkerBoxHandler {
         // 空气右键：Fabric 的 UseItemCallback；返回 SUCCESS + 该 stack 表示消费
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
+            if (!TomkesTookitConfig.enabled("item.shulker_handheld")) return TypedActionResult.pass(player.getStackInHand(hand));
             if (!player.isSneaking() || hand != Hand.MAIN_HAND) return TypedActionResult.pass(player.getStackInHand(hand));
             if (!(player instanceof ServerPlayerEntity sp)) return TypedActionResult.pass(player.getStackInHand(hand));
             ItemStack held = sp.getStackInHand(hand);
@@ -59,6 +60,7 @@ public final class ShulkerBoxHandler {
         // 瞄到方块的右键：也支持，抢在 vanilla 使用行为之前
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
             if (world.isClient) return ActionResult.PASS;
+            if (!TomkesTookitConfig.enabled("item.shulker_handheld")) return ActionResult.PASS;
             if (!player.isSneaking() || hand != Hand.MAIN_HAND) return ActionResult.PASS;
             if (!(player instanceof ServerPlayerEntity sp)) return ActionResult.PASS;
             ItemStack held = sp.getStackInHand(hand);

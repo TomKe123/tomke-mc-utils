@@ -43,13 +43,25 @@ public class CraftingResultMixin {
                                                   CallbackInfo ci) {
         if (world.isClient) return;
         if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
-        if (!SaturationPotion.matches3x3(input)) return;
 
         // 只有 vanilla 没找到配方（result 已被 setStack(EMPTY)）时才覆盖，
         // 避免踩到未来 datapack 可能加的匹配。
         if (!result.getStack(0).isEmpty()) return;
 
-        ItemStack stack = SaturationPotion.buildResult();
+        ItemStack stack;
+        if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.greed_potion")
+            && com.tomkestookit.recipe.GreedPotion.matches3x3(input)) {
+            stack = com.tomkestookit.recipe.GreedPotion.buildResult();
+        } else if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.sugar_tnt")
+            && com.tomkestookit.recipe.SugarTnt.matches3x3(input)) {
+            stack = com.tomkestookit.recipe.SugarTnt.buildResult();
+        } else if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.saturation_potion")
+            && SaturationPotion.matches3x3(input)) {
+            stack = SaturationPotion.buildResult();
+        } else {
+            return;
+        }
+        com.tomkestookit.FakeCraftMarker.mark(stack);
         result.setStack(0, stack);
 
         // vanilla 在 setStack(EMPTY) 之后已经 sendPacket 了一次 EMPTY 结果，

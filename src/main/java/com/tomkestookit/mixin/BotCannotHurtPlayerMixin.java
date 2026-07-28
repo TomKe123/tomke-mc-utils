@@ -20,6 +20,7 @@ public abstract class BotCannotHurtPlayerMixin {
         Object self = this;
         //noinspection ConstantValue -- Qodana 看不到 mixin 目标类会被 apply 到子类
         if (!(self instanceof ServerPlayerEntity target)) return;
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("world.bot_anchor")) return;
         // 玩家目标若本身是假人，不拦；只保护真实玩家
         if (CarpetBotUtil.isFakePlayerStrict(target)) return;
         Entity attacker = source.getAttacker();

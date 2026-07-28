@@ -136,6 +136,7 @@ public final class RegionClearerHandler {
                                               Hand hand, BlockPos pos,
                                               net.minecraft.util.math.Direction direction) {
         if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.region_clearer_use")) return ActionResult.PASS;
         ItemStack tool = player.getMainHandStack();
         if (!RegionClearer.isTool(tool)) return ActionResult.PASS;
         // 服务端负责真正逻辑；客户端也返回 SUCCESS 阻断 vanilla 挖方块动画
@@ -148,6 +149,7 @@ public final class RegionClearerHandler {
     private static ActionResult onUseBlock(PlayerEntity player, net.minecraft.world.World world,
                                            Hand hand, BlockHitResult hit) {
         if (hand != Hand.MAIN_HAND) return ActionResult.PASS;
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.region_clearer_use")) return ActionResult.PASS;
         ItemStack tool = player.getMainHandStack();
         if (!RegionClearer.isTool(tool)) return ActionResult.PASS;
         // 服务端负责真正逻辑；客户端也返回 SUCCESS 阻断 vanilla 剥皮/去蜡等动画

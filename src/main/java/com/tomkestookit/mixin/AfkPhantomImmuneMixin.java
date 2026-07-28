@@ -32,6 +32,7 @@ public abstract class AfkPhantomImmuneMixin {
             Object self = this;
             //noinspection ConstantValue -- Qodana 看不到 mixin 目标类会被 apply 到子类
             if (!(self instanceof ServerPlayerEntity sp)) return;
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("world.afk")) return;
             Entity attacker = source.getAttacker();
             if (!(attacker instanceof PhantomEntity)) return;
             if (!AfkDisplay.isAfk(sp)) return;

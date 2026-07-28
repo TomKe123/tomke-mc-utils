@@ -80,6 +80,7 @@ public class TomkesTookitMod implements ModInitializer {
     }
 
     public static void sendKitMessage(ServerPlayerEntity player) {
+        if (!TomkesTookitConfig.enabled("misc.kit_on_join")) return;
         Text hover = Text.literal("点击领取 Kit").formatted(Formatting.YELLOW);
         Text message = Text.empty()
             .append(Text.literal("[Kit] ").formatted(Formatting.GOLD, Formatting.BOLD))

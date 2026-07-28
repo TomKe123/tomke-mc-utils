@@ -33,6 +33,7 @@ public final class EntityCaptureHandler {
     public static void register() {
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (world.isClient) return ActionResult.PASS;
+            if (!TomkesTookitConfig.enabled("item.entity_capture")) return ActionResult.PASS;
             if (!player.isSneaking()) return ActionResult.PASS;
             if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
             if (entity instanceof PlayerEntity) return ActionResult.PASS;
@@ -65,6 +66,22 @@ public final class EntityCaptureHandler {
 
         NbtCompound entityNbt = new NbtCompound();
         entity.writeNbt(entityNbt);
+        // 年龄：成年/幼年必须显式保留。部分实体在 spawn egg 生成阶段会被
+        // vanilla 重新跑一次随机年龄逻辑，显式写入 Age / IsBaby 作为第一层保险，
+        // 第二层由 PassiveEntityAgeRestoreMixin + MobBabyRestoreMixin 在 initialize
+        // TAIL 强制 setter 回去。
+        if (entity instanceof net.minecraft.entity.passive.PassiveEntity passive) {
+            entityNbt.putInt("Age", passive.getBreedingAge());
+        }
+        // 僵尸类 / 猪灵 / Hoglin 用 IsBaby 判定小/大
+        if (entity instanceof net.minecraft.entity.mob.ZombieEntity z) {
+            entityNbt.putBoolean("IsBaby", z.isBaby());
+        } else if (entity instanceof net.minecraft.entity.mob.PiglinEntity p) {
+            entityNbt.putBoolean("IsBaby", p.isBaby());
+        } else if (entity instanceof net.minecraft.entity.mob.HoglinEntity h) {
+            entityNbt.putBoolean("IsBaby", h.isBaby());
+        }
+
         // 位置 / 朝向 / UUID 应由放置时重新决定：避免回到原地或 UUID 冲突
         entityNbt.remove("UUID");
         entityNbt.remove("Pos");

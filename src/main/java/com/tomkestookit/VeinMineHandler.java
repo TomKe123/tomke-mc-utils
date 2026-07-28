@@ -91,6 +91,7 @@ public final class VeinMineHandler {
     private static void onBlockBroken(World world, PlayerEntity player, BlockPos pos,
                                       BlockState state, net.minecraft.block.entity.BlockEntity be) {
         if (world.isClient) return;
+        if (!TomkesTookitConfig.enabled("item.veinmine")) return;
         if (!(world instanceof ServerWorld sw)) return;
         if (!(player instanceof ServerPlayerEntity sp)) return;
         if (sp.isCreative() || sp.isSpectator()) return;
@@ -99,23 +100,30 @@ public final class VeinMineHandler {
         if (VeinMine.IN_PROGRESS.contains(sp.getUuid())) return;
 
         ItemStack tool = sp.getMainHandStack();
+        // 区域清除斧走它自己的选点逻辑，不走连锁
+        if (com.tomkestookit.regionclearer.RegionClearer.isTool(tool)) return;
 
         VeinMine.IN_PROGRESS.add(sp.getUuid());
         try {
+            boolean handled = false;
             if (tool.getItem() instanceof AxeItem) {
                 if (state.isIn(BlockTags.LOGS)) {
-                    handleTree(sw, sp, tool, pos, state);
+                    handled = handleTree(sw, sp, tool, pos, state);
                 } else if (isMushroom(state)) {
-                    handleMushroom(sw, sp, tool, pos);
+                    handled = handleMushroom(sw, sp, tool, pos);
                 }
             } else if (tool.isOf(Items.SHEARS)) {
-                // 起始块已在 AFTER 事件里被破坏了，state 是它破坏前的样子。
-                // 剪刀连锁只处理天然叶子（避免连到玩家搭的装饰叶）。
+                // The origin block has already been broken by the AFTER event.
+                // Shears chaining only handles natural leaves.
                 if (state.getBlock() instanceof LeavesBlock && !state.get(LeavesBlock.PERSISTENT)) {
-                    handleLeaves(sw, sp, tool, pos);
+                    handled = handleLeaves(sw, sp, tool, pos);
                 }
             } else if (isOreState(state) && tool.getItem() instanceof PickaxeItem) {
-                handleOre(sw, sp, tool, pos, state);
+                handled = handleOre(sw, sp, tool, pos, state);
+            }
+
+            if (!handled) {
+                handleConfiguredBlock(sw, sp, tool, pos, state);
             }
         } finally {
             VeinMine.IN_PROGRESS.remove(sp.getUuid());
@@ -130,13 +138,18 @@ public final class VeinMineHandler {
      * originState 是玩家砍下的起始块（AFTER 事件传入，此时块已被破坏成 AIR），
      * 用来查 LOG_TO_SAPLING 决定补种什么。
      */
-    private static void handleTree(ServerWorld world, ServerPlayerEntity player,
-                                   ItemStack tool, BlockPos origin, BlockState originState) {
+    private static boolean handleTree(ServerWorld world, ServerPlayerEntity player,
+                                     ItemStack tool, BlockPos origin, BlockState originState) {
         List<BlockPos> logs = VeinMine.collect(world, origin, null,
             (o, n) -> n.isIn(BlockTags.LOGS));
-        if (!hasNaturalFoliage(world, origin, logs)) return;
+        if (!hasNaturalFoliage(world, origin, logs)) return false;
+        if (logs.isEmpty()) {
+            replantSapling(world, player, origin, logs, originState);
+            return true;
+        }
         VeinMine.breakAll(world, player, tool, logs);
         replantSapling(world, player, origin, logs, originState);
+        return true;
     }
 
     /**
@@ -158,21 +171,84 @@ public final class VeinMineHandler {
         if (!(saplingItem instanceof BlockItem bi)) return;
         BlockState saplingState = bi.getBlock().getDefaultState();
 
-        // 从 origin + logs 中找 Y 最小的位置作为树基
-        BlockPos plantAt = origin;
+        // 找底层：origin + logs 里最小 Y
+        int minY = origin.getY();
         for (BlockPos p : logs) {
-            if (p.getY() < plantAt.getY()) plantAt = p;
+            if (p.getY() < minY) minY = p.getY();
+        }
+        // 收集底层所有 log 的 xz（供 2×2 检测），并挑 origin 所在底层做备选
+        java.util.Set<Long> bottomXZ = new java.util.HashSet<>();
+        if (origin.getY() == minY) bottomXZ.add(BlockPos.asLong(origin.getX(), 0, origin.getZ()));
+        for (BlockPos p : logs) {
+            if (p.getY() == minY) bottomXZ.add(BlockPos.asLong(p.getX(), 0, p.getZ()));
         }
 
-        // 支撑方块合法性（草/土/菌岩...）
-        if (!saplingState.canPlaceAt(world, plantAt)) return;
-        // 目标位置必须为空气（不能覆盖其他方块）
-        if (!world.getBlockState(plantAt).isAir()) return;
+        // 大丛林 / 大云杉 / 大黑橡：树基是 2×2 时四格都补树苗
+        Block block = originState.getBlock();
+        boolean canBe2x2 = block == Blocks.SPRUCE_LOG || block == Blocks.SPRUCE_WOOD
+            || block == Blocks.STRIPPED_SPRUCE_LOG || block == Blocks.STRIPPED_SPRUCE_WOOD
+            || block == Blocks.JUNGLE_LOG || block == Blocks.JUNGLE_WOOD
+            || block == Blocks.STRIPPED_JUNGLE_LOG || block == Blocks.STRIPPED_JUNGLE_WOOD
+            || block == Blocks.DARK_OAK_LOG || block == Blocks.DARK_OAK_WOOD
+            || block == Blocks.STRIPPED_DARK_OAK_LOG || block == Blocks.STRIPPED_DARK_OAK_WOOD;
 
-        world.setBlockState(plantAt, saplingState, Block.NOTIFY_ALL);
-        world.playSound(null, plantAt,
-            net.minecraft.sound.SoundEvents.BLOCK_GRASS_PLACE,
-            SoundCategory.BLOCKS, 0.8f, 1.0f);
+        if (canBe2x2) {
+            BlockPos corner = find2x2Corner(bottomXZ, minY);
+            if (corner != null) {
+                int planted = 0;
+                for (int dx = 0; dx < 2; dx++) {
+                    for (int dz = 0; dz < 2; dz++) {
+                        BlockPos p = corner.add(dx, 0, dz);
+                        if (tryPlant(world, p, saplingState)) planted++;
+                    }
+                }
+                if (planted > 0) {
+                    world.playSound(null, corner,
+                        net.minecraft.sound.SoundEvents.BLOCK_GRASS_PLACE,
+                        SoundCategory.BLOCKS, 0.8f, 1.0f);
+                }
+                return;
+            }
+        }
+
+        // 单株：origin 所在的（或最矮的）单个位置补 1 棵
+        BlockPos plantAt = origin.getY() == minY ? origin : lowestBottom(logs, minY, origin);
+        if (tryPlant(world, plantAt, saplingState)) {
+            world.playSound(null, plantAt,
+                net.minecraft.sound.SoundEvents.BLOCK_GRASS_PLACE,
+                SoundCategory.BLOCKS, 0.8f, 1.0f);
+        }
+    }
+
+    /** 找底层是否形成 2×2 正方形；返回西北角（最小 x/z），否则 null。*/
+    private static BlockPos find2x2Corner(java.util.Set<Long> bottomXZ, int y) {
+        for (Long key : bottomXZ) {
+            BlockPos base = BlockPos.fromLong(key);
+            int bx = base.getX(), bz = base.getZ();
+            // 尝试以 base 为西北角
+            if (bottomXZ.contains(BlockPos.asLong(bx + 1, 0, bz))
+                && bottomXZ.contains(BlockPos.asLong(bx, 0, bz + 1))
+                && bottomXZ.contains(BlockPos.asLong(bx + 1, 0, bz + 1))) {
+                return new BlockPos(bx, y, bz);
+            }
+        }
+        return null;
+    }
+
+    /** 从底层里挑一个（找不到返回 origin）。*/
+    private static BlockPos lowestBottom(List<BlockPos> logs, int minY, BlockPos origin) {
+        for (BlockPos p : logs) {
+            if (p.getY() == minY) return p;
+        }
+        return origin;
+    }
+
+    /** 试着在 pos 种树苗（空气 + 支撑合法）。返回是否成功种下。*/
+    private static boolean tryPlant(ServerWorld world, BlockPos pos, BlockState saplingState) {
+        if (!world.getBlockState(pos).isAir()) return false;
+        if (!saplingState.canPlaceAt(world, pos)) return false;
+        world.setBlockState(pos, saplingState, Block.NOTIFY_ALL);
+        return true;
     }
 
     /**
@@ -212,12 +288,13 @@ public final class VeinMineHandler {
      * 无"自然"检测——玩家想链接就链接，反正需要 shift+斧头，是主动动作；
      * 单个孤立蘑菇块 BFS 为空，无副作用。
      */
-    private static void handleMushroom(ServerWorld world, ServerPlayerEntity player,
-                                       ItemStack tool, BlockPos origin) {
+    private static boolean handleMushroom(ServerWorld world, ServerPlayerEntity player,
+                                          ItemStack tool, BlockPos origin) {
         List<BlockPos> blocks = VeinMine.collect(world, origin, null,
             (o, n) -> isMushroom(n));
-        if (blocks.isEmpty()) return;
+        if (blocks.isEmpty()) return false;
         VeinMine.breakAll(world, player, tool, blocks);
+        return true;
     }
 
     /** 检测方块是否为大蘑菇方块（三种：茎 / 红帽 / 棕帽）。*/
@@ -234,14 +311,15 @@ public final class VeinMineHandler {
      * 允许跨叶种类连锁（不同品种的树叶挨在一起也算同一片林冠）。
      * 玩家自己放置的树叶（PERSISTENT=true）不参与，避免误伤装饰。
      */
-    private static void handleLeaves(ServerWorld world, ServerPlayerEntity player,
-                                     ItemStack tool, BlockPos origin) {
+    private static boolean handleLeaves(ServerWorld world, ServerPlayerEntity player,
+                                        ItemStack tool, BlockPos origin) {
         List<BlockPos> leaves = VeinMine.collect(world, origin, null, (o, n) -> {
             if (!(n.getBlock() instanceof LeavesBlock)) return false;
             return !n.get(LeavesBlock.PERSISTENT);
         });
-        if (leaves.isEmpty()) return;
+        if (leaves.isEmpty()) return false;
         VeinMine.breakAll(world, player, tool, leaves);
+        return true;
     }
 
     // ------------------------------------------------------------------ ore
@@ -251,12 +329,26 @@ public final class VeinMineHandler {
      * 使用 isSpecificOreTag 而非 isOreTag 做 BFS 匹配，排除 "ores" 宽泛 tag，
      * 确保单次只连锁同一种矿物。
      */
-    private static void handleOre(ServerWorld world, ServerPlayerEntity player,
-                                  ItemStack tool, BlockPos origin, BlockState originState) {
+    private static boolean handleOre(ServerWorld world, ServerPlayerEntity player,
+                                     ItemStack tool, BlockPos origin, BlockState originState) {
         List<BlockPos> ores = VeinMine.collect(world, origin, originState,
             (o, n) -> VeinMine.sharesTag(o, n, VeinMineHandler::isSpecificOreTag));
-        if (ores.isEmpty()) return;
+        if (ores.isEmpty()) return false;
         VeinMine.breakAll(world, player, tool, ores);
+        return true;
+    }
+
+    /** Configured same-block chaining: explicitly allowlisted blocks mine up to their per-break limit. */
+    private static boolean handleConfiguredBlock(ServerWorld world, ServerPlayerEntity player,
+                                                 ItemStack tool, BlockPos origin,
+                                                 BlockState originState) {
+        if (!VeinMineBlockConfig.isConfigured(originState.getBlock())) return false;
+        int limit = VeinMineBlockConfig.getLimit(originState.getBlock());
+        List<BlockPos> blocks = VeinMine.collectUpToTotal(world, origin, originState,
+            (o, n) -> n.isOf(o.getBlock()), limit);
+        if (blocks.isEmpty()) return false;
+        VeinMine.breakAll(world, player, tool, blocks);
+        return true;
     }
 
     /** 判定方块是否属于某种矿：任意 tag 的 path 匹配 ore 命名规则。*/

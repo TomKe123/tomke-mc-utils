@@ -23,6 +23,7 @@ public final class GamemodeShortcut {
     /** 尝试消费一条聊天消息；返回 true 表示已处理，调用方应 cancel packet。*/
     public static boolean tryHandle(ServerPlayerEntity player, String message) {
         if (message == null) return false;
+        if (!TomkesTookitConfig.enabled("cmd.gamemode_shortcut")) return false;
         String cmd = message.strip();
         if (cmd.equals("!c")) {
             player.getServer().execute(() -> toSpectator(player));

@@ -70,7 +70,15 @@ public final class LandmarkCommand {
             ));
     }
 
+    /** 关闭时统一提示；返回 true 表示已被禁用（调用方应立即 return 0）。*/
+    private static boolean disabled(ServerCommandSource src) {
+        if (com.tomkestookit.TomkesTookitConfig.enabled("cmd.landmark")) return false;
+        src.sendFeedback(() -> Text.literal("§c[/landmark] 该命令族已被管理员禁用").formatted(Formatting.RED), false);
+        return true;
+    }
+
     private static int add(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
         ServerPlayerEntity player = tryPlayer(ctx);
         if (player == null) return 0;
         String name = StringArgumentType.getString(ctx, "name").strip();
@@ -96,6 +104,7 @@ public final class LandmarkCommand {
     }
 
     private static int remove(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
         ServerPlayerEntity player = tryPlayer(ctx);
         String name = StringArgumentType.getString(ctx, "name");
         if (!LandmarkStore.remove(name)) {
@@ -109,6 +118,7 @@ public final class LandmarkCommand {
     }
 
     private static int rename(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
         ServerPlayerEntity player = tryPlayer(ctx);
         if (player == null) return 0;
         String oldName = StringArgumentType.getString(ctx, "old");
@@ -132,6 +142,7 @@ public final class LandmarkCommand {
     }
 
     private static int setIcon(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
         ServerPlayerEntity player = tryPlayer(ctx);
         if (player == null) return 0;
         String name = StringArgumentType.getString(ctx, "name");
@@ -153,6 +164,7 @@ public final class LandmarkCommand {
     }
 
     private static int tp(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
         ServerPlayerEntity player = tryPlayer(ctx);
         if (player == null) return 0;
         String name = StringArgumentType.getString(ctx, "name");
@@ -166,6 +178,7 @@ public final class LandmarkCommand {
 
     private static int list(CommandContext<ServerCommandSource> ctx) {
         ServerCommandSource src = ctx.getSource();
+        if (disabled(src)) return 0;
         var all = LandmarkStore.all();
         if (all.isEmpty()) {
             src.sendFeedback(() -> Text.literal("暂无地标。").formatted(Formatting.GRAY), false);

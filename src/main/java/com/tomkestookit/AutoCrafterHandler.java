@@ -70,6 +70,7 @@ public final class AutoCrafterHandler {
         });
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server -> AutoCrafterTracker.flush());
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
+            if (!TomkesTookitConfig.enabled("item.auto_crafter_ops")) return true;
             if (!(world instanceof ServerWorld sw)) return true;
             if (!state.isOf(Blocks.CRAFTING_TABLE)) return true;
             if (!AutoCrafterTracker.isAutoCrafter(sw, pos)) return true;
@@ -166,6 +167,7 @@ public final class AutoCrafterHandler {
     private static final int SWEEP_INTERVAL_TICKS = 40;
 
     private static void tick(MinecraftServer server) {
+        if (!TomkesTookitConfig.enabled("item.auto_crafter_ops")) return;
         int now = server.getTicks();
         // 廉价的每 tick 任务
         if (!RECENTLY_BROKEN.isEmpty()) {

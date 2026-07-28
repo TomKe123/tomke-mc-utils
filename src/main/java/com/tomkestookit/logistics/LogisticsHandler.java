@@ -73,6 +73,7 @@ public final class LogisticsHandler {
         // 并把 barrel 内 inventory 掉在原地；然后清 pair、setBlockState AIR，
         // 阻止 vanilla 走默认 breakBlock（会掉普通 barrel）。
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, be) -> {
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("item.logistics_ops")) return true;
             if (!(world instanceof ServerWorld sw)) return true;
             if (state.getBlock() != Blocks.BARREL) return true;
             String dim = sw.getRegistryKey().getValue().toString();
@@ -330,6 +331,7 @@ public final class LogisticsHandler {
     private static final java.util.Map<String, java.util.List<ItemStack>> LAST_B = new java.util.HashMap<>();
 
     private static void tick(MinecraftServer server) {
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.logistics_ops")) return;
         if ((server.getTicks() & 0x1) != 0) return; // 每 2 tick 一次，节流
 
         // 遍历拿快照，允许在 sweepBrokenEndpoints 里修改 tracker

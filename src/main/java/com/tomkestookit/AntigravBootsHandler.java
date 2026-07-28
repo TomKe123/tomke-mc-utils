@@ -44,6 +44,7 @@ public final class AntigravBootsHandler {
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (!TomkesTookitConfig.enabled("item.antigrav_boots")) return;
             if (server.getTicks() % REFRESH_INTERVAL_TICKS != 0) return;
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
                 if (isWearingAntigravBoots(player)) {
@@ -60,6 +61,7 @@ public final class AntigravBootsHandler {
         });
 
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+            if (!TomkesTookitConfig.enabled("item.antigrav_boots")) return true;
             if (!(entity instanceof ServerPlayerEntity player)) return true;
             if (!isFallDamage(source)) return true;
             if (!isWearingAntigravBoots(player)) return true;
@@ -77,7 +79,7 @@ public final class AntigravBootsHandler {
     /**
      * 把反重力属性套到目标靴子上（就地修改）：
      *   - NBT 标记 TomkesTookitAntigrav = true（触发 tick 和摔落减伤）
-     *   - Unbreakable = true
+     *   - 可选 Unbreakable = true（Kit 版使用；铁砧转移版不继承不可破坏）
      *   - AttributeModifiers：把该靴材质的 vanilla 默认属性（护甲/韧性/抗击退）
      *     复制到 NBT，再补一份速度 modifier；否则一旦 NBT 里出现
      *     AttributeModifiers，vanilla 的默认护甲会被完全覆盖。
@@ -85,9 +87,21 @@ public final class AntigravBootsHandler {
      * 目标必须是穿在脚上的 ArmorItem（EquipmentSlot.FEET）。
      */
     public static void applyAntigrav(ItemStack boots) {
+        applyAntigrav(boots, true);
+    }
+
+    /**
+     * 把反重力属性套到目标靴子上（就地修改）。
+     * @param unbreakable 是否附加 Unbreakable=true；铁砧转移时传 false。
+     */
+    public static void applyAntigrav(ItemStack boots, boolean unbreakable) {
         NbtCompound nbt = boots.getOrCreateNbt();
         nbt.putBoolean(NBT_TAG, true);
-        nbt.putBoolean("Unbreakable", true);
+        if (unbreakable) {
+            nbt.putBoolean("Unbreakable", true);
+        } else {
+            nbt.remove("Unbreakable");
+        }
 
         NbtList attrList = new NbtList();
 

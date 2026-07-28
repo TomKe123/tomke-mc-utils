@@ -37,6 +37,7 @@ public final class BotAnchorHandler {
     private static final double DRIFT_EPS_SQ = 0.25 * 0.25;
 
     private static void tick(MinecraftServer server) {
+        if (!TomkesTookitConfig.enabled("world.bot_anchor")) return;
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
             try {
                 java.util.UUID uid = p.getUuid();

@@ -21,8 +21,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 不兼容组合（如铁靴 + 皮靴）会走"清空输出 + 提前 return"路径，TAIL 抓不到；
  * 用 RETURN 覆盖所有 return 点，保证我们能拿到最后决策权。
  *
- * 属性构造统一走 AntigravBootsHandler.applyAntigrav —— 与 Kit 掉落一致：
- *   - NBT: TomkesTookitAntigrav = true, Unbreakable = true
+ * 属性构造统一走 AntigravBootsHandler.applyAntigrav(result, false)：
+ *   - NBT: TomkesTookitAntigrav = true
+ *   - 不继承/附加 Unbreakable（目标靴仍按原材质正常损耗）
  *   - AttributeModifiers: 复制目标靴的 vanilla 护甲/韧性/抗击退 + 速度 x3
  *
  * 保留物品：目标靴的名字/附魔/耐久/自定义 NBT 全部保留（在 copy 后加属性），
@@ -49,6 +50,7 @@ public abstract class AnvilAntigravMixin {
         ItemStack left = self.getSlot(0).getStack();
         ItemStack right = self.getSlot(1).getStack();
 
+        if (!com.tomkestookit.TomkesTookitConfig.enabled("item.antigrav_boots")) return;
         if (!AntigravBootsHandler.isBoots(left)) return;
         if (!AntigravBootsHandler.hasAntigrav(right)) return;
         if (AntigravBootsHandler.hasAntigrav(left)) return; // 已经反重力过，不重复
@@ -56,7 +58,8 @@ public abstract class AnvilAntigravMixin {
         // "合并附魔"给出普通皮靴，我们要覆盖成反重力版
 
         ItemStack result = left.copy();
-        AntigravBootsHandler.applyAntigrav(result);
+        // 铁砧转移只获得反重力/速度，不继承 Kit 皮靴的不可破坏
+        AntigravBootsHandler.applyAntigrav(result, false);
 
         // 名字：若目标没自定义名，加上"反重力 "前缀作为提示；有则保留
         if (!result.hasCustomName()) {

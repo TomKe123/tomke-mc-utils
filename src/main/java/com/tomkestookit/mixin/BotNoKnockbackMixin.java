@@ -25,6 +25,7 @@ public abstract class BotNoKnockbackMixin {
             // 只处理 ServerPlayerEntity；且必须是 Carpet 假人子类（不做名称模糊匹配，避免误伤真玩家）
             //noinspection ConstantValue -- Qodana 看不到 mixin 目标类会被 apply 到子类
             if (!(self instanceof ServerPlayerEntity sp)) return;
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("world.bot_anchor")) return;
             if (!CarpetBotUtil.isFakePlayerStrict(sp)) return;
             // 默认 on：Carpet 假人一律取消击退，除非菜单显式关掉
             if (BotAnchorTracker.noKnockback(sp.getUuid())

@@ -1,5 +1,6 @@
 package com.tomkestookit;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
@@ -15,6 +16,8 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,8 +31,8 @@ import java.util.UUID;
  *   - 锅归零（回退到 CAULDRON）→ removeLabel
  *   - 破坏事件（PotionCauldronHandler AFTER-break 挂钩）→ removeLabel
  *
- * 兜底：每次交互进入时验证 tracker 里的 pos 仍是 water_cauldron；
- * 不是则视为孤儿 → 清 tracker + 尝试删标签。
+ * 兜底：区块加载时检查该区块内记录；周期清理只处理已加载区块。
+ * 未加载区块绝不 getBlockState，避免把远处有内容的锅误判成孤儿。
  *
  * 用 Entity.readNbt() 通过 NBT 全量配置实体，避开 TextDisplayEntity 私有 setter。
  */
@@ -40,11 +43,21 @@ public final class PotionCauldronLabel {
 
     private PotionCauldronLabel() {}
 
-    /** 注册周期性孤儿清理。启动时 cleanupOrphans 由主类直接调，运行时靠这个 tick 兜底。*/
+    /**
+     * 注册两类兜底清理：
+     *   - 区块加载时：只清该区块里的记录（玩家靠近/服务器加载区块时立即修正）
+     *   - 每 5 分钟：扫一遍 tracker，但只处理已加载区块；未加载区块跳过，避免误删
+     */
     public static void register() {
+        ServerChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+            if (!TomkesTookitConfig.enabled("item.potion_cauldron")) return;
+            cleanupChunk(world, chunk);
+        });
+
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (!TomkesTookitConfig.enabled("item.potion_cauldron")) return;
             if (server.getTicks() % CLEANUP_INTERVAL_TICKS != 0) return;
-            cleanupOrphans(server);
+            cleanupLoadedOrphans(server);
         });
     }
 
@@ -79,18 +92,13 @@ public final class PotionCauldronLabel {
         PotionCauldronTracker.setLabelUuid(key, null);
     }
 
-    /**
-     * 服务器启动时的孤儿扫尾：
-     *   - tracker 里的 pos 已不是 water_cauldron → 移除 entry + 尝试删标签
-     *   - tracker 里的 labelUuid 找不到实体 → 交由后续 ensureLabel 重新创建
-     */
-    public static void cleanupOrphans(MinecraftServer server) {
+    /** 启动时/周期时的兜底清理：只处理已加载区块，未加载区块跳过。*/
+    public static void cleanupLoadedOrphans(MinecraftServer server) {
         var snapshot = PotionCauldronTracker.allEntries();
         for (var e : snapshot.entrySet()) {
             String key = e.getKey();
             ServerWorld world = resolveWorld(server, key);
             if (world == null) {
-                // 维度不存在了，直接扔
                 PotionCauldronTracker.remove(key);
                 continue;
             }
@@ -99,16 +107,41 @@ public final class PotionCauldronLabel {
                 PotionCauldronTracker.remove(key);
                 continue;
             }
-            if (!world.getBlockState(pos).isOf(Blocks.WATER_CAULDRON)) {
-                // pos 已不是水锅：删标签、删条目
-                UUID uuid = PotionCauldronTracker.getLabelUuid(key);
-                if (uuid != null) {
-                    Entity entity = world.getEntity(uuid);
-                    if (entity != null) entity.discard();
-                }
-                PotionCauldronTracker.remove(key);
-            }
+            // 关键：未加载区块跳过，绝不通过 world.getBlockState 触发同步等区块
+            if (!isChunkLoaded(world, pos)) continue;
+            WorldChunk chunk = world.getChunkManager().getWorldChunk(pos.getX() >> 4, pos.getZ() >> 4);
+            if (chunk == null) continue;
+            cleanupIfInvalid(world, key, pos, chunk);
         }
+    }
+
+    /** 区块加载时，只检查该区块内的 potion cauldron 记录。*/
+    public static void cleanupChunk(ServerWorld world, WorldChunk chunk) {
+        ChunkPos chunkPos = chunk.getPos();
+        String dim = world.getRegistryKey().getValue().toString();
+        var snapshot = PotionCauldronTracker.allEntries();
+        for (var e : snapshot.entrySet()) {
+            String key = e.getKey();
+            if (!key.startsWith(dim + ":")) continue;
+            BlockPos pos = parsePos(key);
+            if (pos == null) {
+                PotionCauldronTracker.remove(key);
+                continue;
+            }
+            if (pos.getX() >> 4 != chunkPos.x || pos.getZ() >> 4 != chunkPos.z) continue;
+            cleanupIfInvalid(world, key, pos, chunk);
+        }
+    }
+
+    /** pos 已确认处于传入 chunk 内，检查是否仍是药水锅；不是则删标签+删 entry。*/
+    private static void cleanupIfInvalid(ServerWorld world, String key, BlockPos pos, WorldChunk chunk) {
+        if (chunk.getBlockState(pos).isOf(Blocks.WATER_CAULDRON)) return;
+        UUID uuid = PotionCauldronTracker.getLabelUuid(key);
+        if (uuid != null) {
+            Entity entity = world.getEntity(uuid);
+            if (entity != null) entity.discard();
+        }
+        PotionCauldronTracker.remove(key);
     }
 
     // ------------------------------------------------------------------
@@ -221,6 +254,10 @@ public final class PotionCauldronLabel {
     private static double labelX(BlockPos pos) { return pos.getX() + 0.5; }
     private static double labelY(BlockPos pos) { return pos.getY() + 1.3; }
     private static double labelZ(BlockPos pos) { return pos.getZ() + 0.5; }
+
+    private static boolean isChunkLoaded(ServerWorld world, BlockPos pos) {
+        return world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4);
+    }
 
     private static ServerWorld resolveWorld(MinecraftServer server, String key) {
         int colon = key.lastIndexOf(':');

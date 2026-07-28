@@ -162,6 +162,11 @@ public final class FlyCommand {
             return 0;
         }
 
+        if (!TomkesTookitConfig.enabled("cmd.fly")) {
+            player.sendMessage(Text.literal("§c[/fly] 该功能已被管理员禁用").formatted(Formatting.RED), false);
+            return 0;
+        }
+
         if (player.isCreative() || player.isSpectator()) {
             player.sendMessage(Text.literal("创造/观察者已经能飞了，不需要 /fly。").formatted(Formatting.YELLOW), false);
             return 0;

@@ -37,6 +37,7 @@ public abstract class ZombieVillagerCureGossipMixin {
             //noinspection DataFlowIssue -- mixin 标准写法，运行时 this 就是 ZombieVillagerEntity 实例
             ZombieVillagerEntity self = (ZombieVillagerEntity) (Object) this;
             if (converter == null) return;
+            if (!com.tomkestookit.TomkesTookitConfig.enabled("world.villager_gossip_broadcast")) return;
             if (!(world.getPlayerByUuid(converter) instanceof ServerPlayerEntity healer)) return;
 
             // 立即查找附近的 VillagerEntity 并加入 gossip

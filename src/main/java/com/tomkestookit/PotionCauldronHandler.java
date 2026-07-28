@@ -67,6 +67,7 @@ public final class PotionCauldronHandler {
     private static ActionResult onUseBlock(PlayerEntity player, net.minecraft.world.World world,
                                             Hand hand, BlockHitResult hit) {
         if (world.isClient) return ActionResult.PASS;
+        if (!TomkesTookitConfig.enabled("item.potion_cauldron")) return ActionResult.PASS;
         if (!(world instanceof ServerWorld sw)) return ActionResult.PASS;
         if (!(player instanceof ServerPlayerEntity sp)) return ActionResult.PASS;
         // 只响应主手：副手使用不触发（避免误触）
