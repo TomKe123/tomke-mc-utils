@@ -43,13 +43,11 @@ public final class FlyCommand {
     }
 
     public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 CommandManager.literal("fly")
                     .requires(source -> true) // 全员可用
                     .executes(FlyCommand::toggle)
-            );
-        });
+            ));
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (XP_DEBT.isEmpty()) return;
@@ -67,44 +65,92 @@ public final class FlyCommand {
                 }
 
                 // 速率：level XP / 分钟；level 0（有余量）时兜底按 1 计；上限 20 XP/分钟
-                // （即 1 XP 至少能飞 3 秒，防止高等级瞬秒经验）
                 int effLevel = Math.min(20, Math.max(1, level));
-                float rate = effLevel / TICKS_PER_MINUTE;
-                float debt = XP_DEBT.getOrDefault(uuid, 0.0f) + rate;
-                if (debt >= 1.0f) {
-                    int amount = (int) debt;
-                    debt -= amount;
-                    // addExperience 支持负值：会自动跌落等级，clamp 到 0
-                    player.addExperience(-amount);
+                float ratePerTickXp = effLevel / TICKS_PER_MINUTE;
+
+                // 直接对 progress 做小数扣减，客户端每 tick 都能看到条子平滑动。
+                // progress 单位是"当前 level 到下一级所需 XP"的比例。
+                int nextLevelXp = player.getNextLevelExperience();
+                if (nextLevelXp <= 0) nextLevelXp = 1;
+                float progressStep = ratePerTickXp / nextLevelXp;
+
+                progress -= progressStep;
+                while (progress < 0.0f && level > 0) {
+                    level -= 1;
+                    progress += 1.0f;
                 }
-                XP_DEBT.put(uuid, debt);
+                if (level == 0 && progress < 0.0f) {
+                    cutoff(player, "经验用光了，飞不动了。");
+                    continue;
+                }
+
+                // 三个字段必须保持一致：totalExperience = 累计所有已过等级 xp + progress * 当前级需求。
+                // 只改 level/progress 不改 totalExperience → 传送 / 重生的 copyFrom 之后三者
+                // 不一致，vanilla 或其他 mod 可能重新用 totalExperience 反推 level/progress，
+                // 造成客户端 XP 条错乱。
+                player.experienceLevel = level;
+                player.experienceProgress = progress;
+                player.totalExperience = computeTotalXp(level, progress);
+                // 主动发包让客户端每 tick 看到平滑变化；vanilla tick 也会自己发（因为
+                // totalExperience 已被我们同步过），两者语义一致，不会闪烁。
+                player.networkHandler.sendPacket(
+                    new net.minecraft.network.packet.s2c.play.ExperienceBarUpdateS2CPacket(
+                        progress, player.totalExperience, level));
             }
         });
 
-        // 重连恢复飞行权限
+        // 重连恢复飞行权限 + 补一次经验条广播（新 handler 需要 fresh sync）
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.player;
             if (XP_DEBT.containsKey(player.getUuid())) {
                 enableFly(player);
+                syncExperience(player);
             }
         });
 
-        // 重生时新的 ServerPlayerEntity 会重置 abilities，重新赋予
+        // 重生：新的 ServerPlayerEntity 会重置 abilities，重新赋予
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
             if (XP_DEBT.containsKey(newPlayer.getUuid())) {
                 enableFly(newPlayer);
+                syncExperience(newPlayer);
             }
         });
 
-        // 走传送门（下界/末地）跨维度时不触发 AFTER_RESPAWN，abilities 在服务端
-        // 虽然保留但客户端会在维度切换后重置 flying 状态导致坠落。这里补一次
-        // sendAbilitiesUpdate 同步给客户端。
+        // 走传送门（下界/末地）跨维度时 abilities / experience 在客户端会被重置。
+        // 补一次同步：sendAbilitiesUpdate + ExperienceBarUpdateS2CPacket。
         ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register(
             (player, origin, destination) -> {
                 if (XP_DEBT.containsKey(player.getUuid())) {
                     enableFly(player);
+                    syncExperience(player);
                 }
             });
+    }
+
+    /** 主动把当前 level/progress/total 广播给玩家客户端（用于传送/重生后立即同步）。*/
+    private static void syncExperience(ServerPlayerEntity player) {
+        int lvl = player.experienceLevel;
+        float prog = player.experienceProgress;
+        // 重算 totalExperience，保证与 level/progress 一致
+        player.totalExperience = computeTotalXp(lvl, prog);
+        player.networkHandler.sendPacket(
+            new net.minecraft.network.packet.s2c.play.ExperienceBarUpdateS2CPacket(
+                prog, player.totalExperience, lvl));
+    }
+
+    /** 从当前 level 升到下一级所需 XP（vanilla 公式）。*/
+    private static int xpForLevelUp(int level) {
+        if (level >= 30) return 112 + (level - 30) * 9;
+        if (level >= 15) return 37 + (level - 15) * 5;
+        return 7 + level * 2;
+    }
+
+    /** total_experience = 累计所有已过等级的 xp + 当前进度 * 当前级需求。*/
+    private static int computeTotalXp(int level, float progress) {
+        int total = 0;
+        for (int i = 0; i < level; i++) total += xpForLevelUp(i);
+        total += Math.round(progress * xpForLevelUp(level));
+        return total;
     }
 
     private static int toggle(CommandContext<ServerCommandSource> ctx) {
