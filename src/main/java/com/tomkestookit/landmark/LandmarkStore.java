@@ -55,10 +55,55 @@ public final class LandmarkStore {
         return landmarks.containsKey(name);
     }
 
+    /** 名字长度上限（字符数）。*/
+    public static final int MAX_NAME_LEN = 24;
+
+    /** 名字合法性：非空、长度 1..24。*/
+    public static boolean isValidName(String name) {
+        if (name == null) return false;
+        String trimmed = name.strip();
+        if (trimmed.isEmpty()) return false;
+        return trimmed.length() <= MAX_NAME_LEN;
+    }
+
     /** 返回 true 表示新增，false 表示已存在（不覆盖）。*/
     public static boolean add(Landmark lm) {
         if (landmarks.containsKey(lm.name)) return false;
         landmarks.put(lm.name, lm);
+        save();
+        return true;
+    }
+
+    /**
+     * 重命名。旧名不存在或新名已存在或新名非法则失败。
+     * 保序：用新 LinkedHashMap 重建，把当前记录以新 key 放回原位置。
+     */
+    public static boolean rename(String oldName, String newName) {
+        if (!landmarks.containsKey(oldName)) return false;
+        if (!isValidName(newName)) return false;
+        if (oldName.equals(newName)) return false;
+        if (landmarks.containsKey(newName)) return false;
+
+        LinkedHashMap<String, Landmark> rebuilt = new LinkedHashMap<>();
+        for (Map.Entry<String, Landmark> e : landmarks.entrySet()) {
+            if (e.getKey().equals(oldName)) {
+                Landmark lm = e.getValue();
+                lm.name = newName;
+                rebuilt.put(newName, lm);
+            } else {
+                rebuilt.put(e.getKey(), e.getValue());
+            }
+        }
+        landmarks = rebuilt;
+        save();
+        return true;
+    }
+
+    /** 设置图标 registry id。地标不存在返回 false。*/
+    public static boolean setIcon(String name, String iconId) {
+        Landmark lm = landmarks.get(name);
+        if (lm == null) return false;
+        lm.iconId = iconId;
         save();
         return true;
     }
