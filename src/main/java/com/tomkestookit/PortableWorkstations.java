@@ -1,10 +1,9 @@
 package com.tomkestookit;
 
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.EnderChestInventory;
 import net.minecraft.screen.CraftingScreenHandler;
 import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerContext;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -20,9 +19,18 @@ import net.minecraft.util.Formatting;
  *   用 {@link GenericContainerScreenHandler#createGeneric9x3} 打开标准 UI；
  *   vanilla EnderChestInventory.onOpen / onClose 会正常触发（无绑定的 activeBlockEntity 也 OK）。
  *
- * 工作台：{@link CraftingScreenHandler} + {@link ScreenHandlerContext#EMPTY}，
- *   vanilla 里 CraftingTableBlock 也是这条路径。EMPTY context 意味着"关掉时物品不掉地上"——
- *   会用 shift-click 或 Q 键掉在玩家周围，符合玩家体感。
+ * 工作台：{@link CraftingScreenHandler} + {@link ScreenHandlerContext#create}(world, pos)。
+ *   非 EMPTY context 是必须的：
+ *     - CraftingScreenHandler.onContentChanged 通过 context.run 触发 updateResult
+ *       计算合成结果；EMPTY 会让输出槽永远空
+ *     - close() 里 dropInventory 依赖 context.run 把 3×3 输入槽内容塞回背包/掉地，
+ *       EMPTY 会导致物品被吞
+ *   同时用匿名子类覆盖 canUse 恒返回 true：vanilla 的 CraftingScreenHandler.canUse
+ *   会调 ScreenHandler.canUse(context, player, CRAFTING_TABLE)，检查 pos 处方块是否
+ *   是工作台且距离 &le; 8。用玩家脚下方块位置显然过不了，如果不覆盖，服务器下一
+ *   tick 就会关掉 UI —— 就是"随身工作台打不开"那个 bug 的成因。
+ *   pos 用玩家当前 blockPos —— 只被 context.run(dropInventory) 用作物品掉落坐标，
+ *   刚好落在玩家脚下（塞不下背包时也不会掉丢）。
  *
  * 两个入口都返 boolean（true=打开了；false=被 config 关掉或玩家不合法），
  * 供菜单按钮和命令 executes 共用。
@@ -57,17 +65,16 @@ public final class PortableWorkstations {
             player.sendMessage(Text.literal("§c[随身工作台] 该功能已被管理员禁用").formatted(Formatting.RED), true);
             return false;
         }
+        ScreenHandlerContext context = ScreenHandlerContext.create(player.getWorld(), player.getBlockPos());
         Text title = Text.literal("§6§l§n工作台");
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, playerInv, ignored) -> factory(syncId, playerInv),
+            (syncId, playerInv, ignored) -> new CraftingScreenHandler(syncId, playerInv, context) {
+                // vanilla canUse 会检查 context 处方块是否是工作台，随身场景过不了；
+                // 玩家能打开这个 UI 已经是靠命令/菜单授权过的，就让 canUse 一直放行。
+                @Override public boolean canUse(PlayerEntity p) { return true; }
+            },
             title
         ));
         return true;
-    }
-
-    private static ScreenHandler factory(int syncId, PlayerInventory playerInv) {
-        // ScreenHandlerContext.EMPTY：关闭时输入槽的物品会自动回到玩家背包 / 溢出掉地上，
-        // 无绑定方块位置——符合"随身"语义。
-        return new CraftingScreenHandler(syncId, playerInv, ScreenHandlerContext.EMPTY);
     }
 }
