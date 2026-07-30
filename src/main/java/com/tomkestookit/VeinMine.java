@@ -55,7 +55,8 @@ public final class VeinMine {
     private VeinMine() {}
 
     /**
-     * BFS 收集"与起始块连通、且 accept 判定为同类"的所有方块，最多 MAX_BLOCKS 个。
+     * BFS 收集"与起始块连通、且 accept 判定为同类"的所有方块，最多 MAX_BLOCKS-1 个额外块。
+     * 总破坏量（含起始块）最多 128。
      * 不包含起始块（起始已由原版事件破坏）。
      */
     public static List<BlockPos> collect(ServerWorld world, BlockPos origin, BlockState originState,
@@ -66,7 +67,8 @@ public final class VeinMine {
         Deque<BlockPos> queue = new ArrayDeque<>();
         queue.add(origin);
 
-        while (!queue.isEmpty() && result.size() < MAX_BLOCKS) {
+        int maxAdditionalBlocks = MAX_BLOCKS - 1; // include the already-broken origin in the 128 total
+        while (!queue.isEmpty() && result.size() < maxAdditionalBlocks) {
             BlockPos current = queue.poll();
             for (int[] off : NEIGHBOR_26) {
                 BlockPos next = current.add(off[0], off[1], off[2]);
@@ -75,7 +77,74 @@ public final class VeinMine {
                 if (!accept.test(originState, ns)) continue;
                 result.add(next.toImmutable());
                 queue.add(next);
-                if (result.size() >= MAX_BLOCKS) break;
+                if (result.size() >= maxAdditionalBlocks) break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * BFS 收集最多 maxTotalBlocks-1 个额外块。总破坏量包含起始块。
+     * 用于白名单方块的“单次挖掘数量限制”：连通域再大也只连锁本次上限内的块。
+     */
+    public static List<BlockPos> collectUpToTotal(ServerWorld world, BlockPos origin,
+                                                  BlockState originState,
+                                                  BiPredicate<BlockState, BlockState> accept,
+                                                  int maxTotalBlocks) {
+        List<BlockPos> result = new ArrayList<>();
+        if (maxTotalBlocks <= 1) return result;
+        Set<BlockPos> visited = new HashSet<>();
+        visited.add(origin.toImmutable());
+        Deque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(origin);
+
+        int maxAdditionalBlocks = maxTotalBlocks - 1;
+        while (!queue.isEmpty() && result.size() < maxAdditionalBlocks) {
+            BlockPos current = queue.poll();
+            for (int[] off : NEIGHBOR_26) {
+                BlockPos next = current.add(off[0], off[1], off[2]);
+                if (!visited.add(next.toImmutable())) continue;
+                BlockState ns = world.getBlockState(next);
+                if (!accept.test(originState, ns)) continue;
+                result.add(next.toImmutable());
+                queue.add(next);
+                if (result.size() >= maxAdditionalBlocks) break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Collects the complete connected component and returns it only when the total
+     * size, including the already-broken origin block, is at most maxTotalBlocks.
+     * If the component is larger, returns an empty list so terrain is not partially chained.
+     */
+    public static List<BlockPos> collectIfTotalAtMost(ServerWorld world, BlockPos origin,
+                                                      BlockState originState,
+                                                      BiPredicate<BlockState, BlockState> accept,
+                                                      int maxTotalBlocks) {
+        List<BlockPos> result = new ArrayList<>();
+        Set<BlockPos> visited = new HashSet<>();
+        visited.add(origin.toImmutable());
+        Deque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(origin);
+
+        int totalAccepted = 1; // include the already-broken origin block
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.poll();
+            for (int[] off : NEIGHBOR_26) {
+                BlockPos next = current.add(off[0], off[1], off[2]);
+                if (!visited.add(next.toImmutable())) continue;
+                BlockState ns = world.getBlockState(next);
+                if (!accept.test(originState, ns)) continue;
+
+                totalAccepted++;
+                if (totalAccepted > maxTotalBlocks) {
+                    return List.of();
+                }
+
+                result.add(next.toImmutable());
+                queue.add(next);
             }
         }
         return result;
