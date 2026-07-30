@@ -28,8 +28,9 @@ public final class CarpetPermission {
     /**
      * Carpet 模组已知的所有根命令。
      * 包含 fabric-carpet 核心和 carpet-extra 常用指令。
+     * public 常量供 SignCommandHandler 等模块引用，避免维护两份白名单。
      */
-    private static final String[] CARPET_COMMANDS = {
+    public static final String[] CARPET_COMMANDS = {
         "carpet", "tick", "log", "player", "spawn", "info",
         "counter", "perimeterinfo", "distance", "draw", "script",
         "profile", "c", "s"

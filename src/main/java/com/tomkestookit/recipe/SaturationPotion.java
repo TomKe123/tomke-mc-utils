@@ -70,9 +70,15 @@ public final class SaturationPotion {
         NbtCompound nbt = stack.getOrCreateNbt();
         NbtCompound display = nbt.getCompound("display");
         NbtList lore = new NbtList();
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("§7面粉与劳动的浓缩")
-                .styled(s -> s.withItalic(false)))));
+        for (String line : List.of(
+            "§8「九个面包换来一瓶不饿。」",
+            "§7麦浪的余韵，永恒的饱足感",
+            "§7投掷命中：永久滋养效果",
+            "§8面包师看到会哭"
+        )) {
+            lore.add(NbtString.of(Text.Serializer.toJson(
+                Text.literal(line).styled(s -> s.withItalic(false)))));
+        }
         if (nourishment == null) {
             lore.add(NbtString.of(Text.Serializer.toJson(
                 Text.literal("§c需要 Farmer's Delight 加载")
