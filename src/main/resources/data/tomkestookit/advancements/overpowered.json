@@ -1,0 +1,36 @@
+{
+  "parent": "minecraft:husbandry/root",
+  "display": {
+    "icon": {
+      "item": "minecraft:enchanted_golden_apple"
+    },
+    "title": {
+      "translate": "advancements.tomkestookit.overpowered.title",
+      "fallback": "君临天下"
+    },
+    "description": {
+      "translate": "advancements.tomkestookit.overpowered.description",
+      "fallback": "吃下一个附魔金苹果"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "eat_enchanted_golden_apple": {
+      "trigger": "minecraft:consume_item",
+      "conditions": {
+        "item": {
+          "items": ["minecraft:enchanted_golden_apple"]
+        }
+      }
+    }
+  },
+  "requirements": [
+    ["eat_enchanted_golden_apple"]
+  ],
+  "rewards": {
+    "experience": 100
+  }
+}

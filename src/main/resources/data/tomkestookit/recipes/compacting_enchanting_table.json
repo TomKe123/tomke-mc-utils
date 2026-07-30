@@ -1,0 +1,9 @@
+{
+  "type": "create:compacting",
+  "ingredients": [
+    { "item": "minecraft:enchanting_table" }
+  ],
+  "results": [
+    { "item": "minecraft:diamond", "count": 2 }
+  ]
+}

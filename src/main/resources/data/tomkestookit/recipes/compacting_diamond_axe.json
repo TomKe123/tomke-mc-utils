@@ -1,0 +1,9 @@
+{
+  "type": "create:compacting",
+  "ingredients": [
+    { "item": "minecraft:diamond_axe" }
+  ],
+  "results": [
+    { "item": "minecraft:diamond", "count": 3 }
+  ]
+}

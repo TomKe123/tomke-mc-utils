@@ -1,0 +1,9 @@
+{
+  "type": "create:compacting",
+  "ingredients": [
+    { "item": "minecraft:diamond_hoe" }
+  ],
+  "results": [
+    { "item": "minecraft:diamond", "count": 2 }
+  ]
+}

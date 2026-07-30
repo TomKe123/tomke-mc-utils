@@ -1,0 +1,9 @@
+{
+  "type": "create:compacting",
+  "ingredients": [
+    { "item": "minecraft:diamond_leggings" }
+  ],
+  "results": [
+    { "item": "minecraft:diamond", "count": 7 }
+  ]
+}
