@@ -24,7 +24,8 @@ public class AnvilCostCapMixin {
 
     @ModifyConstant(
         method = "updateResult",
-        constant = @Constant(intValue = 40)
+        constant = @Constant(intValue = 40),
+        expect = 3, require = 3
     )
     private int tomkestookit$raiseCostCap(int original) {
         if (!com.tomkestookit.TomkesTookitConfig.enabled("misc.anvil_cost_cap")) return original;
