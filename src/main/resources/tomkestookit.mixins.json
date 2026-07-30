@@ -37,7 +37,6 @@
     "LogisticsCraftingMixin",
     "SignCommandBlockEntityMixin",
     "SignItemPlaceMixin",
-    "SpawnHelperInfoMixin",
     "VillagerDiscountMixin"
   ],
   "injectors": {

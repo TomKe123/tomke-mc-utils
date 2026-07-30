@@ -95,7 +95,6 @@ public final class AdminFeature {
         add("world.afk",                 "AFK 显示与免幻翼", Items.CLOCK,         Group.WORLD, "60 秒不动加 [AFK]，幻翼伤害归零");
         add("world.sleep_percentage",    "1 人睡觉跳夜",     Items.RED_BED,       Group.WORLD, "启服写 gamerule；关掉后需要 /gamerule 手动改回");
         add("world.spawn_protection",    "传送/重生无敌",    Items.SHIELD,        Group.WORLD, "5 秒 RESISTANCE IV + 防火");
-        add("world.per_player_spawn",    "刷怪每人独立",     Items.ZOMBIE_HEAD,   Group.WORLD, "每个玩家享受独立 vanilla 刷怪上限，多人服体验≈单机");
 
         // ---------- UI ----------
         add("ui.sidebar",                "侧栏 TPS/MSPT",    Items.OAK_SIGN,      Group.UI, "每秒刷新");
