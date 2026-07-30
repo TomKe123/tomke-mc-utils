@@ -1,6 +1,7 @@
 package com.tomkestookit.regionfiller;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -41,6 +42,25 @@ public final class RegionFiller {
         if (nbt == null || !nbt.contains(NBT_TAG)) return false;
         Item i = stack.getItem();
         return i == Items.WATER_BUCKET || i == Items.LAVA_BUCKET;
+    }
+
+    /**
+     * 该位置是否可被 {@code type} 覆盖填充：
+     *   - 纯空气：允许（保留原语义）
+     *   - 同类流体的"非源方块"（水桶匹配流动水、岩浆桶匹配流动岩浆）：允许，用源覆盖 → 相当于把流水凝成水源
+     *
+     * 特意只放行同类流体的流动态：
+     *   - waterlogged 台阶/楼梯这类含水但主方块非流体的方块不动，避免误伤结构
+     *   - 水桶不会把流动岩浆变成水源（反之亦然），语义清晰
+     *   - 源方块本身跳过（isStill()=true），既不浪费 setBlockState 也不会 tick 邻居
+     */
+    public static boolean isFillable(BlockState state, FillerType type) {
+        if (state.isAir()) return true;
+        var fs = state.getFluidState();
+        if (fs.isEmpty() || fs.isStill()) return false;
+        return type == FillerType.WATER
+            ? fs.isIn(net.minecraft.registry.tag.FluidTags.WATER)
+            : fs.isIn(net.minecraft.registry.tag.FluidTags.LAVA);
     }
 
     /** 取 type，非我们的工具返回 null。*/

@@ -184,8 +184,8 @@ public final class RegionFillerHandler {
             return;
         }
 
-        // 只数空气位置。未加载 chunk 跳过并汇总。
-        int airCount = 0;
+        // 数可填位置：空气 + 同类流动流体（后者会被凝成源方块）。未加载 chunk 跳过并汇总。
+        int fillCount = 0;
         int unloadedChunks = 0;
         BlockPos.Mutable m = new BlockPos.Mutable();
         for (int y = min.getY(); y <= max.getY(); y++) {
@@ -196,7 +196,7 @@ public final class RegionFillerHandler {
                         unloadedChunks++;
                         continue;
                     }
-                    if (world.getBlockState(m).isAir()) airCount++;
+                    if (RegionFiller.isFillable(world.getBlockState(m), type)) fillCount++;
                 }
             }
         }
@@ -208,23 +208,23 @@ public final class RegionFillerHandler {
             return;
         }
 
-        if (airCount == 0) {
-            player.sendMessage(Text.literal("§7[区域填充] 区域内无空气位置，无需填充。"), false);
+        if (fillCount == 0) {
+            player.sendMessage(Text.literal("§7[区域填充] 区域内无可填位置，无需填充。"), false);
             PENDING.remove(player.getUuid());
             return;
         }
 
-        Pending pending = new Pending(player.getUuid(), world, type, min, max, airCount);
+        Pending pending = new Pending(player.getUuid(), world, type, min, max, fillCount);
         PENDING.put(player.getUuid(), pending);
 
-        int batches = (airCount + BATCH_SIZE - 1) / BATCH_SIZE;
-        int seconds = airCount <= SYNC_LIMIT ? 0 : (batches * BATCH_INTERVAL_TICKS / 20);
+        int batches = (fillCount + BATCH_SIZE - 1) / BATCH_SIZE;
+        int seconds = fillCount <= SYNC_LIMIT ? 0 : (batches * BATCH_INTERVAL_TICKS / 20);
 
         MutableText line1 = Text.literal(String.format(
-            "§7[区域填充] 区域 §f(%d,%d,%d) → (%d,%d,%d)§7 · 空气 §f%d§7 位置",
+            "§7[区域填充] 区域 §f(%d,%d,%d) → (%d,%d,%d)§7 · 可填 §f%d§7 位置",
             min.getX(), min.getY(), min.getZ(),
             max.getX(), max.getY(), max.getZ(),
-            airCount));
+            fillCount));
         MutableText line2 = seconds == 0
             ? Text.literal("§7一次性执行")
             : Text.literal(String.format("§7分 §f%d§7 批，约 §f%ds", batches, seconds));
@@ -273,7 +273,7 @@ public final class RegionFillerHandler {
                 for (int z = p.min.getZ(); z <= p.max.getZ(); z++) {
                     m.set(x, y, z);
                     if (!p.world.isChunkLoaded(x >> 4, z >> 4)) continue;
-                    if (p.world.getBlockState(m).isAir()) {
+                    if (RegionFiller.isFillable(p.world.getBlockState(m), p.type)) {
                         queue.add(m.toImmutable());
                     }
                 }
@@ -332,8 +332,9 @@ public final class RegionFillerHandler {
             BlockPos pos = job.queue.poll();
             if (pos == null) break;
             if (!world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
-            // 只填空气位置（清除时也用 dynamic 查最新状态，避免踩到期间流入的流体）
-            if (!world.getBlockState(pos).isAir()) continue;
+            // 分批期间可能有别的方块流进/被打破，dynamic 查最新状态。
+            // 允许覆盖：空气 + 同类流动流体（后者被覆盖为源方块，等于凝流水为水源）。
+            if (!RegionFiller.isFillable(world.getBlockState(pos), job.type)) continue;
             world.setBlockState(pos, job.type.fluidBlock.getDefaultState(),
                 Block.NOTIFY_LISTENERS | Block.FORCE_STATE);
             job.done++;
