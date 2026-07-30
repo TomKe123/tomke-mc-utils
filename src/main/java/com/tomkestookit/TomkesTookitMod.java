@@ -62,6 +62,7 @@ public class TomkesTookitMod implements ModInitializer {
         AfkDisplay.register();
         PortableCommand.register();
         PlayerTeleport.register();
+        PerPlayerSpawnCap.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             TomkesTookitConfig.load(server);
