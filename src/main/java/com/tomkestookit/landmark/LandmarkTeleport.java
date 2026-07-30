@@ -28,7 +28,8 @@ public final class LandmarkTeleport {
             player.sendMessage(Text.literal("地标所在维度不存在：" + lm.dimension).formatted(Formatting.RED), true);
             return false;
         }
-        player.teleport(world, lm.x, lm.y, lm.z, lm.yaw, lm.pitch);
+        com.tomkestookit.PlayerTeleport.teleport(player, world, lm.x, lm.y, lm.z, lm.yaw, lm.pitch);
+        com.tomkestookit.SpawnProtection.grant(player, "地标：" + lm.name);
         player.sendMessage(Text.literal("已传送到 " + lm.name).formatted(Formatting.GREEN), true);
         return true;
     }

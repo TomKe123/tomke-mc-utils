@@ -56,6 +56,7 @@ public final class PlayerListMenu {
 
         Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
+        Map<Integer, Consumer<ServerPlayerEntity>> rightActions = new HashMap<>();
 
         // header 中央显示总人数
         inv.setStack(4, MenuButtons.button(Items.COMPASS,
@@ -70,7 +71,9 @@ public final class PlayerListMenu {
             int slot = FIRST_SLOT + (i - start);
             inv.setStack(slot, playerHead(viewer, target));
             String targetName = target.getGameProfile().getName();
+            java.util.UUID targetUuid = target.getUuid();
             actions.put(slot, viewerRef -> teleportTo(viewerRef, targetName));
+            rightActions.put(slot, viewerRef -> PlayerDetailMenu.open(viewerRef, targetUuid));
         }
 
         // 分页 & 返回
@@ -93,7 +96,7 @@ public final class PlayerListMenu {
         MenuButtons.fillBackground(inv);
 
         viewer.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions),
+            (syncId, playerInv, ignored) -> new MenuScreenHandler(syncId, playerInv, inv, actions, rightActions, null),
             TITLE
         ));
     }
@@ -108,8 +111,10 @@ public final class PlayerListMenu {
             return;
         }
         ServerWorld world = (ServerWorld) target.getWorld();
-        viewer.teleport(world, target.getX(), target.getY(), target.getZ(),
+        com.tomkestookit.PlayerTeleport.teleport(viewer, world,
+            target.getX(), target.getY(), target.getZ(),
             target.getYaw(), target.getPitch());
+        com.tomkestookit.SpawnProtection.grant(viewer, "传送到 " + targetName);
         viewer.sendMessage(Text.literal("已传送到 " + targetName).formatted(Formatting.GREEN), true);
         viewer.closeHandledScreen();
     }
@@ -127,13 +132,17 @@ public final class PlayerListMenu {
         } else {
             lore.add("§7维度 §f" + dim + " §8(跨维度)");
         }
+        boolean bot = com.tomkestookit.CarpetBotUtil.isFakePlayer(target);
+        int food = target.getHungerManager().getFoodLevel();
         lore.add("§7生命 §c" + (int) Math.ceil(target.getHealth())
             + "§7/§c" + (int) Math.ceil(target.getMaxHealth())
-            + "  §7等级 §e" + target.experienceLevel);
+            + "  §7饱食 §6" + food);
+        lore.add("§7等级 §e" + target.experienceLevel);
         lore.add("");
-        lore.add("§a▶ 点击传送");
+        lore.add("§a左键 §7→ 传送");
+        lore.add("§b右键 §7→ 详情 / " + (bot ? "§c控制假人" : "§7查看背包"));
         return MenuButtons.skull(target.getGameProfile(),
-            "§e§l" + name, lore);
+            (bot ? "§c§l[假人] " : "§e§l") + name, lore);
     }
 
     private static boolean sameDimension(ServerPlayerEntity a, ServerPlayerEntity b) {

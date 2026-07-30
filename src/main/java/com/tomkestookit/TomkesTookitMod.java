@@ -61,6 +61,7 @@ public class TomkesTookitMod implements ModInitializer {
         SugarTntHandler.register();
         AfkDisplay.register();
         PortableCommand.register();
+        PlayerTeleport.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             TomkesTookitConfig.load(server);

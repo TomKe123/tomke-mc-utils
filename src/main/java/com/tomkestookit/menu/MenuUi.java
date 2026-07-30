@@ -341,7 +341,8 @@ public final class MenuUi {
             spawn = target.getSpawnPos();
         }
         float yaw = player.getSpawnAngle();
-        player.teleport(target, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5, yaw, 0);
+        com.tomkestookit.PlayerTeleport.teleport(player, target,
+            spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5, yaw, 0);
         com.tomkestookit.SpawnProtection.grant(player, "返回出生点");
         player.sendMessage(Text.literal("已传送到出生点").formatted(Formatting.GREEN), true);
         player.closeHandledScreen();

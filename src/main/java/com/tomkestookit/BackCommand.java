@@ -116,7 +116,7 @@ public final class BackCommand {
             player.sendMessage(Text.literal("死亡地点所在维度不存在：" + loc.dimension).formatted(Formatting.RED), false);
             return false;
         }
-        player.teleport(target, loc.x, loc.y, loc.z, loc.yaw, loc.pitch);
+        PlayerTeleport.teleport(player, target, loc.x, loc.y, loc.z, loc.yaw, loc.pitch);
         SpawnProtection.grant(player, "返回死亡地点");
         player.sendMessage(Text.literal("已返回死亡地点").formatted(Formatting.GREEN), true);
         return true;

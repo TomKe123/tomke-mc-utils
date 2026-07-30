@@ -65,7 +65,8 @@ public final class PlayerDetailMenu {
         actions.put(2, p -> {
             ServerPlayerEntity t = p.getServer().getPlayerManager().getPlayer(targetName);
             if (t == null) return;
-            p.teleport((net.minecraft.server.world.ServerWorld) t.getWorld(),
+            com.tomkestookit.PlayerTeleport.teleport(p,
+                (net.minecraft.server.world.ServerWorld) t.getWorld(),
                 t.getX(), t.getY(), t.getZ(), t.getYaw(), t.getPitch());
             com.tomkestookit.SpawnProtection.grant(p, "传送到 " + targetName);
             p.closeHandledScreen();
@@ -142,7 +143,8 @@ public final class PlayerDetailMenu {
         actions.put(31, p -> {
             ServerPlayerEntity t = p.getServer().getPlayerManager().getPlayer(targetUuid);
             if (t == null) return;
-            p.teleport((net.minecraft.server.world.ServerWorld) t.getWorld(),
+            com.tomkestookit.PlayerTeleport.teleport(p,
+                (net.minecraft.server.world.ServerWorld) t.getWorld(),
                 t.getX(), t.getY(), t.getZ(), t.getYaw(), t.getPitch());
             com.tomkestookit.SpawnProtection.grant(p, "传送到 " + t.getGameProfile().getName());
             p.closeHandledScreen();
