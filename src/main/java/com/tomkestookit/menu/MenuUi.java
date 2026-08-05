@@ -90,6 +90,14 @@ public final class MenuUi {
         inv.setStack(43, recipeButton(player));
         actions.put(43, RecipeMenu::open);
 
+        // 饰品袋入口
+        inv.setStack(44, MenuButtons.button(Items.ENDER_EYE, "§5§l饰品袋",
+            List.of("§727 格饰品容器",
+                "§7放入饰品即可获得被动效果",
+                "",
+                "§a▶ 点击打开")));
+        actions.put(44, TrinketBagMenu::open);
+
         // 帮助 / 说明按钮
         inv.setStack(45, helpButton());
         actions.put(45, HelpMenu::open);
@@ -98,6 +106,10 @@ public final class MenuUi {
         inv.setStack(46, specialRecipeButton());
         actions.put(46, RecipeMenu::openSpecial);
 
+        // 垃圾桶
+        inv.setStack(47, trashCanButton());
+        actions.put(47, com.tomkestookit.menu.TrashCanMenu::open);
+
         // 随身末影箱（受 item.portable_ender_chest 控制，关掉时按钮仍显示但点击后收到红色提示）
         inv.setStack(48, enderChestButton());
         actions.put(48, p -> com.tomkestookit.PortableWorkstations.openEnderChest(p));
@@ -105,6 +117,10 @@ public final class MenuUi {
         // 随身工作台
         inv.setStack(50, portableWorkbenchButton());
         actions.put(50, p -> com.tomkestookit.PortableWorkstations.openCraftingTable(p));
+
+        // 发起清理投票（全服掉落物/经验球，5 分钟冷却）
+        inv.setStack(51, voteCleanupButton());
+        actions.put(51, MenuUi::startCleanupVote);
 
         // 管理员面板入口（仅 OP 可见；非 OP 该槽会被 fillBackground 用玻璃板遮住）
         if (player.hasPermissionLevel(2)) {
@@ -160,6 +176,31 @@ public final class MenuUi {
         return MenuButtons.button(Items.ENDER_CHEST, "§5§l随身末影箱",
             List.of("§7在任何地方打开你的末影箱",
                 "§8命令：§f/echest"));
+    }
+
+    private static ItemStack voteCleanupButton() {
+        return MenuButtons.button(Items.BLAZE_POWDER, "§6§l发起清理投票",
+            List.of("§7全服广播投票，20 秒投票期",
+                "§7同意 ≥ 50% 通过 → 清理所有维度",
+                "§8· 掉落物 + 经验球",
+                "§8· 与定时/卡顿清理独立",
+                "§8· 5 分钟冷却",
+                "",
+                "§a▶ 点击发起"));
+    }
+
+    private static void startCleanupVote(ServerPlayerEntity player) {
+        Text result = com.tomkestookit.DroppedItemCleanup.startPlayerVote(player);
+        player.closeHandledScreen();
+        player.sendMessage(result, false);
+    }
+
+    private static ItemStack trashCanButton() {
+        return MenuButtons.button(Items.LAVA_BUCKET, "§c§l垃圾桶",
+            List.of("§7全服共享 540 格垃圾桶",
+                "§7每 10 分钟自动清空",
+                "",
+                "§a▶ 点击打开"));
     }
 
     private static ItemStack portableWorkbenchButton() {

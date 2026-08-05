@@ -1,9 +1,22 @@
 {
   "type": "create:compacting",
   "ingredients": [
-    { "item": "minecraft:enchanting_table" }
+    {
+      "item": "minecraft:enchanting_table"
+    }
   ],
   "results": [
-    { "item": "minecraft:diamond", "count": 2 }
+    {
+      "item": "minecraft:diamond",
+      "count": 2
+    }
+  ],
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:mod_loaded",
+      "values": [
+        "create"
+      ]
+    }
   ]
 }

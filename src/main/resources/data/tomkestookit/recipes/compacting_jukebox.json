@@ -1,9 +1,22 @@
 {
   "type": "create:compacting",
   "ingredients": [
-    { "item": "minecraft:jukebox" }
+    {
+      "item": "minecraft:jukebox"
+    }
   ],
   "results": [
-    { "item": "minecraft:diamond", "count": 1 }
+    {
+      "item": "minecraft:diamond",
+      "count": 1
+    }
+  ],
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:mod_loaded",
+      "values": [
+        "create"
+      ]
+    }
   ]
 }

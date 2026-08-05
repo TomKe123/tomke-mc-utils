@@ -27,10 +27,10 @@ import java.util.function.Consumer;
 
 /**
  * "本包配方" 子菜单：展示 namespace = tomkestookit 的所有配方，
- * 分 crafting / stonecutting 两个 tab。仅展示，不发放物品。
+ * 分 合成 / 切石 / 魔改配方 / 饰品 / 重铸石 五个 tab。仅展示，不发放物品。
  *
  * 布局 9x6：
- *   row 0: [tab 合成 0] [tab 切石 1] . . . . . . .
+ *   row 0: [tab 合成 0] [tab 切石 1] [tab 魔改 2] [tab 饰品 3] [tab 重铸石 4] . . . .
  *   row 1-4: 配方格 9-44 共 36 个
  *   row 5: [◀ 45] . . . [返回 49] . . . [▶ 53]
  */
@@ -46,7 +46,9 @@ public final class RecipeMenu {
     private enum Tab {
         CRAFTING("合成", Items.CRAFTING_TABLE),
         STONECUTTING("切石", Items.STONECUTTER),
-        SPECIAL("特殊", Items.NETHER_STAR);
+        SPECIAL("魔改配方", Items.NETHER_STAR),
+        TRINKET("饰品", Items.AMETHYST_SHARD),
+        REFORGE("重铸石", Items.ANVIL);
 
         final String label;
         final net.minecraft.item.Item icon;
@@ -72,20 +74,17 @@ public final class RecipeMenu {
         Inventory inv = MenuScreenHandler.buildInventory(6);
         Map<Integer, Consumer<ServerPlayerEntity>> actions = new HashMap<>();
 
-        // tabs
-        inv.setStack(0, tabButton(Tab.CRAFTING,
-            countOf(viewer.getServer(), Tab.CRAFTING), tab == Tab.CRAFTING));
-        actions.put(0, p -> open(p, Tab.CRAFTING, 0));
-        inv.setStack(1, tabButton(Tab.STONECUTTING,
-            countOf(viewer.getServer(), Tab.STONECUTTING), tab == Tab.STONECUTTING));
-        actions.put(1, p -> open(p, Tab.STONECUTTING, 0));
-        inv.setStack(2, tabButton(Tab.SPECIAL,
-            SpecialRecipeCatalog.all().size(), tab == Tab.SPECIAL));
-        actions.put(2, p -> open(p, Tab.SPECIAL, 0));
+        // tabs (5 个)
+        Tab[] tabs = Tab.values();
+        for (int t = 0; t < tabs.length; t++) {
+            Tab tt = tabs[t];
+            inv.setStack(t, tabButton(tt, countOf(viewer.getServer(), tt), tab == tt));
+            actions.put(t, p -> open(p, tt, 0));
+        }
 
         int totalPages;
-        if (tab == Tab.SPECIAL) {
-            totalPages = renderSpecialTab(viewer, inv, actions, page);
+        if (tab == Tab.SPECIAL || tab == Tab.TRINKET || tab == Tab.REFORGE) {
+            totalPages = renderSpecialTab(viewer, inv, actions, page, tab);
         } else {
             totalPages = renderRecipeTab(viewer, inv, tab, page);
         }
@@ -138,8 +137,12 @@ public final class RecipeMenu {
     }
 
     private static int countOf(MinecraftServer server, Tab tab) {
-        if (tab == Tab.SPECIAL) return SpecialRecipeCatalog.all().size();
-        return collect(server, tab).size();
+        return switch (tab) {
+            case SPECIAL -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.CRAFTING).size();
+            case TRINKET -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.TRINKET).size();
+            case REFORGE -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.REFORGE).size();
+            default -> collect(server, tab).size();
+        };
     }
 
     /** 常规 tab 渲染到 inv，返回总页数。*/
@@ -163,8 +166,13 @@ public final class RecipeMenu {
 
     /** 特殊 tab 渲染到 inv，返回总页数。槽位可以点击打开详情。*/
     private static int renderSpecialTab(ServerPlayerEntity viewer, Inventory inv,
-                                        Map<Integer, Consumer<ServerPlayerEntity>> actions, int page) {
-        List<SpecialRecipeEntry> list = SpecialRecipeCatalog.all();
+                                        Map<Integer, Consumer<ServerPlayerEntity>> actions, int page, Tab tab) {
+        SpecialRecipeCatalog.Category cat = switch (tab) {
+            case TRINKET -> SpecialRecipeCatalog.Category.TRINKET;
+            case REFORGE -> SpecialRecipeCatalog.Category.REFORGE;
+            default -> SpecialRecipeCatalog.Category.CRAFTING;
+        };
+        List<SpecialRecipeEntry> list = SpecialRecipeCatalog.byCategory(cat);
         int totalPages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(0, Math.min(page, totalPages - 1));
         int start = page * PAGE_SIZE;
@@ -183,6 +191,9 @@ public final class RecipeMenu {
         ItemStack icon = entry.resultSupplier().get().copy();
         List<String> lore = new ArrayList<>();
         lore.add("§7—— 3×3 合成图示 ——");
+        if (entry.key().startsWith("reforge_")) {
+            lore.add("§7合成得石头 §8· §7铁砧敲装备");
+        }
         lore.addAll(entry.description());
         lore.add("");
         lore.add("§8点击查看详细做法");
@@ -209,14 +220,36 @@ public final class RecipeMenu {
         // 中部 3×3 图示（位置 20-22 / 29-31 / 38-40）
         int[] gridSlots = {20, 21, 22, 29, 30, 31, 38, 39, 40};
         for (int i = 0; i < 9; i++) {
+            String linkTarget = entry.gridLinkTarget(i);
+            if (linkTarget != null) {
+                // 有跳转链接：用目标配方的产物 ItemStack 作为 icon（带 NBT/附魔）
+                SpecialRecipeEntry target = null;
+                for (SpecialRecipeEntry e : SpecialRecipeCatalog.all()) {
+                    if (e.key().equals(linkTarget)) { target = e; break; }
+                }
+                if (target != null) {
+                    ItemStack icon = target.resultSupplier().get().copy();
+                    // 追加一行提示，说明可点击
+                    appendClickHint(icon, "§e▶ 点击查看该配方");
+                    inv.setStack(gridSlots[i], icon);
+                    final String targetKey = linkTarget;
+                    actions.put(gridSlots[i], p -> openSpecialDetail(p, targetKey));
+                    continue;
+                }
+            }
             ItemStack g = entry.gridStack(i);
             if (!g.isEmpty()) inv.setStack(gridSlots[i], g);
         }
 
-        // 返回
+        // 返回：根据 key 判断该配方在哪个 tab
         inv.setStack(BACK_SLOT, MenuButtons.backButton());
         SpecialRecipeEntry captured = entry;
-        actions.put(BACK_SLOT, p -> open(p, Tab.SPECIAL, 0));
+        Tab returnTab;
+        if (key.startsWith("trinket_")) returnTab = Tab.TRINKET;
+        else if (key.startsWith("reforge_")) returnTab = Tab.REFORGE;
+        else returnTab = Tab.SPECIAL;
+        final Tab returnTabRef = returnTab;
+        actions.put(BACK_SLOT, p -> open(p, returnTabRef, 0));
 
         MenuButtons.fillBackground(inv);
 
@@ -312,6 +345,20 @@ public final class RecipeMenu {
             lore.add(net.minecraft.nbt.NbtString.of(Text.Serializer.toJson(
                 Text.literal(line).styled(s -> s.withItalic(false)))));
         }
+        display.put("Lore", lore);
+        nbt.put("display", display);
+        nbt.putInt("HideFlags", 63);
+    }
+
+    /** 在物品末尾追加一行提示（不影响原名字）。*/
+    private static void appendClickHint(ItemStack stack, String hint) {
+        net.minecraft.nbt.NbtCompound nbt = stack.getOrCreateNbt();
+        net.minecraft.nbt.NbtCompound display = nbt.getCompound("display");
+        net.minecraft.nbt.NbtList lore = display.contains("Lore")
+            ? display.getList("Lore", 8)
+            : new net.minecraft.nbt.NbtList();
+        lore.add(net.minecraft.nbt.NbtString.of(Text.Serializer.toJson(
+            Text.literal(hint).styled(s -> s.withItalic(false)))));
         display.put("Lore", lore);
         nbt.put("display", display);
         nbt.putInt("HideFlags", 63);

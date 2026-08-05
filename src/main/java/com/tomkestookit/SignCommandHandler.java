@@ -42,6 +42,9 @@ public final class SignCommandHandler {
     /** 告示牌 item stack 上的 pending 命令 / 自定义 label，放置时迁移到 BE。*/
     public static final String STACK_PENDING_KEY = "TomkesTookitPendingCommand";
     public static final String STACK_PENDING_LABEL = "TomkesTookitPendingLabel";
+    /** 任务组告示牌的 block entity / item stack 数据。*/
+    public static final String TASK_GROUP_NBT_KEY = "TomkesTookitTaskGroup";
+    public static final String TASK_GROUP_NAME_NBT_KEY = "TomkesTookitTaskGroupName";
 
     public static final List<String> ALLOWED_PREFIXES = buildAllowedPrefixes();
 
@@ -174,6 +177,8 @@ public final class SignCommandHandler {
             return;
         }
         NbtCompound nbt = main.getOrCreateNbt();
+        nbt.remove(TASK_GROUP_NBT_KEY);
+        nbt.remove(TASK_GROUP_NAME_NBT_KEY);
         nbt.putString(STACK_PENDING_KEY, cmd);
         nbt.putString(STACK_PENDING_LABEL, label == null ? "" : label);
         // 加 lore 提示玩家这块告示牌已绑定
@@ -202,7 +207,43 @@ public final class SignCommandHandler {
     public static void bindOnPlace(net.minecraft.world.World world,
                                    net.minecraft.util.math.BlockPos pos, ItemStack stack) {
         NbtCompound nbt = stack.getNbt();
-        if (nbt == null || !nbt.contains(STACK_PENDING_KEY)) return;
+        if (nbt == null) return;
+
+        BlockEntity be = world.getBlockEntity(pos);
+        if (!(be instanceof SignBlockEntity sign)) return;
+        SignCommandBlockEntityAccess access = (SignCommandBlockEntityAccess) sign;
+
+        if (nbt.contains(TASK_GROUP_NBT_KEY)) {
+            String groupId = nbt.getString(TASK_GROUP_NBT_KEY);
+            if (groupId == null || groupId.isEmpty()) return;
+            String groupName = nbt.contains(TASK_GROUP_NAME_NBT_KEY) ? nbt.getString(TASK_GROUP_NAME_NBT_KEY) : groupId;
+            access.tomkestookit$setTaskGroup(groupId);
+            access.tomkestookit$setTaskGroupName(groupName);
+            access.tomkestookit$setCommand(null);
+
+            net.minecraft.text.Text line1 = net.minecraft.text.Text.literal("[任务组告示牌]")
+                .styled(s -> s.withItalic(false).withColor(net.minecraft.util.Formatting.AQUA));
+            net.minecraft.text.Text line2 = net.minecraft.text.Text.literal(groupName)
+                .styled(s -> s.withItalic(false).withColor(net.minecraft.util.Formatting.WHITE));
+
+            var front = sign.getFrontText().withMessage(0, line1).withMessage(1, line2);
+            sign.setText(front, true);
+            var back = sign.getBackText().withMessage(0, line1).withMessage(1, line2);
+            sign.setText(back, false);
+            sign.setWaxed(true);
+            sign.markDirty();
+            var pkt = sign.toUpdatePacket();
+            if (pkt != null && world instanceof net.minecraft.server.world.ServerWorld sw) {
+                for (var p : sw.getServer().getPlayerManager().getPlayerList()) {
+                    if (p.getServerWorld() == sw) {
+                        p.networkHandler.sendPacket(pkt);
+                    }
+                }
+            }
+            return;
+        }
+
+        if (!nbt.contains(STACK_PENDING_KEY)) return;
         String cmd = nbt.getString(STACK_PENDING_KEY);
         if (cmd == null || cmd.isEmpty()) return;
         // 白名单再校验
@@ -214,9 +255,9 @@ public final class SignCommandHandler {
         }
         if (!allowed) return;
 
-        BlockEntity be = world.getBlockEntity(pos);
-        if (!(be instanceof SignBlockEntity sign)) return;
-        ((SignCommandBlockEntityAccess) sign).tomkestookit$setCommand(cmd);
+        access.tomkestookit$setCommand(cmd);
+        access.tomkestookit$setTaskGroup(null);
+        access.tomkestookit$setTaskGroupName(null);
 
         // 第 1 行固定：[命令告示牌]  第 2 行：玩家自定义文字
         String label = nbt.contains(STACK_PENDING_LABEL) ? nbt.getString(STACK_PENDING_LABEL) : "";
@@ -261,7 +302,13 @@ public final class SignCommandHandler {
             return ActionResult.PASS;
         }
 
-        String currentCmd = ((SignCommandBlockEntityAccess) sign).tomkestookit$getCommand();
+        SignCommandBlockEntityAccess access = (SignCommandBlockEntityAccess) sign;
+        String currentGroup = access.tomkestookit$getTaskGroup();
+        if (currentGroup != null && !currentGroup.isEmpty()) {
+            return executeTaskGroup(sp, currentGroup, access.tomkestookit$getTaskGroupName());
+        }
+
+        String currentCmd = access.tomkestookit$getCommand();
         if (currentCmd == null || currentCmd.isEmpty()) return ActionResult.PASS;
 
         return executeBound(sp, currentCmd);
@@ -285,6 +332,25 @@ public final class SignCommandHandler {
         }
         sp.getServer().getCommandManager().executeWithPrefix(sp.getCommandSource(), "/" + cmd);
         sp.sendMessage(Text.literal("§7[告示牌] 已执行 §f/" + cmd).formatted(Formatting.GRAY), true);
+        return ActionResult.SUCCESS;
+    }
+
+    private static ActionResult executeTaskGroup(ServerPlayerEntity sp, String groupId, String groupName) {
+        long now = System.currentTimeMillis();
+        Long last = LAST_USE.get(sp.getUuid());
+        if (last != null && now - last < COOLDOWN_MS) return ActionResult.SUCCESS;
+        LAST_USE.put(sp.getUuid(), now);
+
+        com.tomkestookit.commandtask.CommandTaskStore.TaskGroup group =
+            com.tomkestookit.commandtask.CommandTaskStore.group(groupId);
+        if (group == null) {
+            sp.sendMessage(Text.literal("§c[任务组] 未找到任务组：" + groupId).formatted(Formatting.RED), true);
+            return ActionResult.SUCCESS;
+        }
+        com.tomkestookit.commandtask.CommandTaskRunner.runGroup(
+            sp, group, "任务组告示牌 " + (groupName == null || groupName.isEmpty() ? group.name : groupName));
+        sp.sendMessage(Text.literal("§7[任务组] 已执行 §f" + (groupName == null || groupName.isEmpty() ? group.name : groupName))
+            .formatted(Formatting.GRAY), true);
         return ActionResult.SUCCESS;
     }
 

@@ -64,6 +64,14 @@ public final class AdminPanelMenu {
         inv.setStack(40, kitButton());
         actions.put(40, AdminKitMenu::open);
 
+        // 命令任务组 / 开机自启
+        inv.setStack(42, MenuButtons.button(Items.REPEATER, "§d§l命令任务组 / 自启",
+            List.of("§7把命令告示牌组装成任务组",
+                "§7再把任务组打包成开机自启集合",
+                "",
+                "§e▶ 点击进入")));
+        actions.put(42, CommandTaskMenu::open);
+
         // 底部导航
         inv.setStack(45, MenuButtons.backButton());
         actions.put(45, MenuUi::open);

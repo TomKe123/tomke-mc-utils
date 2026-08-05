@@ -170,7 +170,23 @@ public final class HelpMenu {
                 "§735% §7音乐类：唱片残片 / cat / 13 / otherside",
                 "§720% §7迅捷潜行附魔书 I-III",
                 "§712% §7监守 / 幽静 盔甲纹饰",
-                "§715% §7附魔金苹果 §71-2"))
+                "§715% §7附魔金苹果 §71-2")),
+        new HelpEntry(Items.ENDER_EYE, "§e§l饰品系统",
+            List.of("§7菜单中打开 27 格饰品袋",
+                "§7放入饰品即获被动效果",
+                "§7合成：中心特殊物品 + 8 周同种材料",
+                "§7共 §f15 §7种饰品：",
+                "§8速度/夜视/防火/力量/摔落免疫",
+                "§8吸附/催熟/饱食/虚空救命/图腾碎片",
+                "§8水下呼吸/保经验/防仇恨/探矿/护盾")),
+        new HelpEntry(Items.ANVIL, "§e§l重铸石系统",
+            List.of("§7铁砧 + 装备 + 重铸石 = 追加属性",
+                "§7不覆盖已有属性，同石不可重复",
+                "§7兼容任何 mod 装备",
+                "§7共 §f11 §7种重铸石",
+                "§8武器：+攻击/+速度/+5攻击(稀有)",
+                "§8防具：+护甲/+韧性/+血量/+击退抗性/+移速",
+                "§8通用：+幸运 / 取消悬空惩罚"))
     );
 
     private static final List<HelpEntry> RECIPES = List.of(
@@ -183,8 +199,8 @@ public final class HelpMenu {
                 "§7吃下可获得成就 §f君临天下")),
         new HelpEntry(Items.SPLASH_POTION, "§e§l面包精华（喷溅药水）",
             List.of("§f3×3§7 全 9 个面包",
-                "§7永久滋养效果",
-                "§8需装载 Farmer's Delight")),
+                "§7永久饱和效果",
+                "§8需装载 vanilla 饱和效果")),
         new HelpEntry(Items.EXPERIENCE_BOTTLE, "§e§l附魔之瓶",
             List.of("§f切石§7：§f青金石块§7 → 经验瓶",
                 "§8低价刷经验瓶")),

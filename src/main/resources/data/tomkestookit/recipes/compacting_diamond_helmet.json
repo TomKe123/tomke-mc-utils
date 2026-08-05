@@ -1,9 +1,22 @@
 {
   "type": "create:compacting",
   "ingredients": [
-    { "item": "minecraft:diamond_helmet" }
+    {
+      "item": "minecraft:diamond_helmet"
+    }
   ],
   "results": [
-    { "item": "minecraft:diamond", "count": 5 }
+    {
+      "item": "minecraft:diamond",
+      "count": 5
+    }
+  ],
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:mod_loaded",
+      "values": [
+        "create"
+      ]
+    }
   ]
 }

@@ -93,6 +93,14 @@ public final class PlayerDetailMenu {
             List.of("§7点击打开假人动作 / 姿态 / 移除 面板")));
         actions.put(6, p -> BotControlMenu.open(p, targetUuid));
 
+        // 饰品袋按钮
+        com.mojang.authlib.GameProfile targetProfileForBag = target.getGameProfile();
+        inv.setStack(4, MenuButtons.button(Items.ENDER_EYE, "§d§l饰品袋",
+            List.of("§7查看/编辑该假人的饰品袋",
+                "§8同种饰品不叠加，被动效果与真玩家一致")));
+        actions.put(4, p -> TrinketBagMenu.openFor(p, targetProfileForBag, targetUuid,
+            back -> open(back, targetUuid)));
+
         inv.setStack(8, MenuButtons.backButton());
         actions.put(8, PlayerListMenu::open);
 
@@ -169,6 +177,16 @@ public final class PlayerDetailMenu {
         Map<Integer, Consumer<ServerPlayerEntity>> rightActions = new HashMap<>();
         String targetName = target.getGameProfile().getName();
         inv.setStack(0, infoCard(target, false));
+
+        // 饰品袋按钮（授权范围内也可查看/编辑对方饰品袋）
+        com.mojang.authlib.GameProfile targetProfileForBag = target.getGameProfile();
+        java.util.UUID targetIdForBag = target.getUuid();
+        inv.setStack(4, MenuButtons.button(Items.ENDER_EYE, "§d§l饰品袋",
+            List.of("§7查看/编辑该玩家的饰品袋",
+                "§8已获授权，规则同背包")));
+        actions.put(4, p -> TrinketBagMenu.openFor(p, targetProfileForBag, targetIdForBag,
+            back -> openApprovedInventory(back, targetIdForBag)));
+
         inv.setStack(8, MenuButtons.backButton());
         actions.put(8, PlayerListMenu::open);
         for (int i = 0; i < 54; i++) {

@@ -40,13 +40,13 @@ public final class AutoCrafterTracker {
         public int z;
         public String[] recipe = new String[9];
         public String[] inventory = new String[10];
-        /** always / powered / pulse；pulseMode 用于兼容旧存档。*/
         public String triggerMode = "powered";
         public boolean pulseMode;
         public boolean powered;
         public int flashTicks;
         public String markerUuid;
         public String status = "空闲";
+        public String ejectDirection = "none";
 
         public Config() {}
 
@@ -195,5 +195,6 @@ public final class AutoCrafterTracker {
         }
         if (c.triggerMode == null || c.triggerMode.isBlank()) c.triggerMode = c.pulseMode ? "pulse" : "powered";
         if (c.status == null || c.status.isBlank()) c.status = "空闲";
+        if (c.ejectDirection == null || c.ejectDirection.isBlank()) c.ejectDirection = "none";
     }
 }

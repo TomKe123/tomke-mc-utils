@@ -1,9 +1,22 @@
 {
   "type": "create:compacting",
   "ingredients": [
-    { "item": "minecraft:diamond_hoe" }
+    {
+      "item": "minecraft:diamond_hoe"
+    }
   ],
   "results": [
-    { "item": "minecraft:diamond", "count": 2 }
+    {
+      "item": "minecraft:diamond",
+      "count": 2
+    }
+  ],
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:mod_loaded",
+      "values": [
+        "create"
+      ]
+    }
   ]
 }

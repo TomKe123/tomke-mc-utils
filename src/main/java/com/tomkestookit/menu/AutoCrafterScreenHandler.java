@@ -49,11 +49,13 @@ public final class AutoCrafterScreenHandler extends ScreenHandler {
     private static final int ARROW_SLOT = 13;
     private static final int STATUS_SLOT = 22;
     private static final int MODE_SLOT = 45;
+    private static final int EJECT_SLOT = 47;
     private static final int HELP_SLOT = 53;
 
     private final AutoCrafterInventory inventory;
     private final AutoCrafterTracker.Config config;
     private final ServerWorld world;
+    private final BlockPos posRef;
 
     public AutoCrafterScreenHandler(int syncId, PlayerInventory playerInventory, Inventory inventory,
                                     AutoCrafterTracker.Config config, ServerWorld world, BlockPos pos) {
@@ -61,6 +63,7 @@ public final class AutoCrafterScreenHandler extends ScreenHandler {
         this.inventory = (AutoCrafterInventory) inventory;
         this.config = config;
         this.world = world;
+        this.posRef = pos;
 
         for (int i = 0; i < 54; i++) {
             int col = i % 9;
@@ -128,8 +131,42 @@ public final class AutoCrafterScreenHandler extends ScreenHandler {
         if (slot == ARROW_SLOT) return arrowStack(flash);
         if (slot == STATUS_SLOT) return statusStack(flash);
         if (slot == MODE_SLOT) return modeStack(flash);
+        if (slot == EJECT_SLOT) return ejectStack();
         if (slot == HELP_SLOT) return helpStack(flash);
         return borderStack(flash);
+    }
+
+    private ItemStack ejectStack() {
+        String dir = config.ejectDirection == null ? "none" : config.ejectDirection;
+        String label = switch (dir) {
+            case "up" -> "上";
+            case "down" -> "下";
+            case "north" -> "北";
+            case "south" -> "南";
+            case "east" -> "东";
+            case "west" -> "西";
+            default -> "不弹出";
+        };
+        Item icon = switch (dir) {
+            case "up" -> Items.LIME_BANNER;
+            case "down" -> Items.MAGENTA_BANNER;
+            case "north" -> Items.RED_BANNER;
+            case "south" -> Items.GREEN_BANNER;
+            case "east" -> Items.LIGHT_BLUE_BANNER;
+            case "west" -> Items.YELLOW_BANNER;
+            default -> Items.HOPPER;
+        };
+        ItemStack stack = new ItemStack(icon);
+        stack.setCustomName(applyItalic(Text.literal("§6§l⇈ 弹出方向：§f" + label)));
+        applyLore(stack, List.of(
+            "§7当前 §f" + label + (dir.equals("none") ? "" : " (" + dir + ")"),
+            "§7点击进入方向选择界面",
+            "",
+            "§8· 不弹出：产物走内部输出槽",
+            "§8· 上下东南西北：产物直接弹为掉落物",
+            "§8· 弹出模式不再受输出满限制"
+        ));
+        return stack;
     }
 
     private ItemStack arrowStack(boolean flash) {
@@ -218,6 +255,13 @@ public final class AutoCrafterScreenHandler extends ScreenHandler {
     public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
         if (!(player instanceof ServerPlayerEntity sp)) {
             super.onSlotClick(slotIndex, button, actionType, player);
+            return;
+        }
+        // 弹出方向按钮：跳到独立菜单
+        if (slotIndex == EJECT_SLOT) {
+            click(sp);
+            sp.closeHandledScreen();
+            AutoCrafterEjectMenu.open(sp, world, posRef);
             return;
         }
         // 触发模式按钮

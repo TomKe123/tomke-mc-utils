@@ -1,9 +1,22 @@
 {
   "type": "create:compacting",
   "ingredients": [
-    { "item": "minecraft:diamond_leggings" }
+    {
+      "item": "minecraft:diamond_leggings"
+    }
   ],
   "results": [
-    { "item": "minecraft:diamond", "count": 7 }
+    {
+      "item": "minecraft:diamond",
+      "count": 7
+    }
+  ],
+  "fabric:load_conditions": [
+    {
+      "condition": "fabric:mod_loaded",
+      "values": [
+        "create"
+      ]
+    }
   ]
 }

@@ -98,6 +98,36 @@ public class KitCommand {
                                 return 1;
                             } catch (Exception e) { return 0; }
                         }))
+                    // /tomkestookit elite ...：精英怪 / Boss 相关命令
+                    .then(EliteCommand.buildBranch())
+                    // /tomkestookit cleanup vote <yes|no> <voteId>：任何玩家均可投票
+                    // /tomkestookit cleanup force <all|dim>：仅 OP，跳过投票立即清理
+                    .then(CommandManager.literal("cleanup")
+                        .then(CommandManager.literal("vote")
+                            .then(CommandManager.literal("yes")
+                                .then(CommandManager.argument("voteId", StringArgumentType.word())
+                                    .executes(ctx -> {
+                                        try {
+                                            return DroppedItemCleanup.voteCommand(
+                                                ctx.getSource().getPlayerOrThrow(),
+                                                StringArgumentType.getString(ctx, "voteId"), true);
+                                        } catch (Exception e) { return 0; }
+                                    })))
+                            .then(CommandManager.literal("no")
+                                .then(CommandManager.argument("voteId", StringArgumentType.word())
+                                    .executes(ctx -> {
+                                        try {
+                                            return DroppedItemCleanup.voteCommand(
+                                                ctx.getSource().getPlayerOrThrow(),
+                                                StringArgumentType.getString(ctx, "voteId"), false);
+                                        } catch (Exception e) { return 0; }
+                                    }))))
+                        .then(CommandManager.literal("force")
+                            .requires(src -> src.hasPermissionLevel(2))
+                            .executes(ctx -> DroppedItemCleanup.forceCleanup(ctx.getSource(), "all"))
+                            .then(CommandManager.argument("target", StringArgumentType.string())
+                                .executes(ctx -> DroppedItemCleanup.forceCleanup(
+                                    ctx.getSource(), StringArgumentType.getString(ctx, "target"))))))
             ));
     }
 

@@ -1,7 +1,11 @@
 package com.tomkestookit;
 
+import com.tomkestookit.commandtask.CommandTaskRunner;
+import com.tomkestookit.commandtask.CommandTaskStore;
 import com.tomkestookit.landmark.LandmarkCommand;
 import com.tomkestookit.landmark.LandmarkStore;
+import com.tomkestookit.trinket.TrinketEffectHandler;
+import com.tomkestookit.trinket.TrinketStore;
 import com.tomkestookit.menu.MenuClock;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -44,6 +48,8 @@ public class TomkesTookitMod implements ModInitializer {
         com.tomkestookit.regionclearer.RegionClearerHandler.register();
         com.tomkestookit.regionfiller.RegionFillerHandler.register();
         SignCommandHandler.register();
+        ChatInterceptHandler.register();
+        CommandTaskRunner.register();
         BotInteractHandler.register();
         BotAnchorHandler.register();
         com.tomkestookit.menu.BotMenuTracker.register();
@@ -58,13 +64,29 @@ public class TomkesTookitMod implements ModInitializer {
         Sidebar.register();
         TabHealth.register();
         SpawnProtection.register();
+        DroppedItemCleanup.register();
+        TrinketEffectHandler.register();
+        com.tomkestookit.trinket.TrinketCommand.register();
+        com.tomkestookit.reforge.AutoMenderHandler.register();
+        com.tomkestookit.menu.TrashCanMenu.register();
+        PerPlayerSpawnCap.register();
         SugarTntHandler.register();
         AfkDisplay.register();
         PortableCommand.register();
         PlayerTeleport.register();
 
+        // 精英怪 + Boss 系统
+        com.tomkestookit.elite.EliteMobHandler.register();
+        com.tomkestookit.elite.ThreatRating.register();
+        com.tomkestookit.elite.EliteDebuffAura.register();
+        com.tomkestookit.elite.skill.EliteSkillExecutor.register();
+        com.tomkestookit.boss.BossSummonHandler.register();
+        com.tomkestookit.boss.BossBarManager.register();
+
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             TomkesTookitConfig.load(server);
+            CommandTaskStore.load(server);
+            TrinketStore.load(server);
             KitTracker.load(server);
             LandmarkStore.load(server);
             VeinMineTracker.load(server);
@@ -75,6 +97,8 @@ public class TomkesTookitMod implements ModInitializer {
             AutoCrafterTracker.load(server);
             PotionCauldronLabel.cleanupLoadedOrphans(server);
             com.tomkestookit.logistics.LogisticsTracker.load(server);
+            com.tomkestookit.elite.ThreatRating.load(server);
+            com.tomkestookit.boss.BossCooldownStore.load(server);
             // 启动时清一次孤儿：只对已加载 chunk 生效；未加载 chunk 里的 marker
             // 会在 chunk 加载后由 tick sweep 兜底处理。
             int cleaned = com.tomkestookit.logistics.LogisticsHandler.sweepOrphans(server);

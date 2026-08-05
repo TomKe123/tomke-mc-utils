@@ -48,19 +48,9 @@ public class CraftingResultMixin {
         // 避免踩到未来 datapack 可能加的匹配。
         if (!result.getStack(0).isEmpty()) return;
 
-        ItemStack stack;
-        if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.greed_potion")
-            && com.tomkestookit.recipe.GreedPotion.matches3x3(input)) {
-            stack = com.tomkestookit.recipe.GreedPotion.buildResult();
-        } else if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.sugar_tnt")
-            && com.tomkestookit.recipe.SugarTnt.matches3x3(input)) {
-            stack = com.tomkestookit.recipe.SugarTnt.buildResult();
-        } else if (com.tomkestookit.TomkesTookitConfig.enabled("recipe.saturation_potion")
-            && SaturationPotion.matches3x3(input)) {
-            stack = SaturationPotion.buildResult();
-        } else {
-            return;
-        }
+        ItemStack stack = com.tomkestookit.SpecialCraftingCatalog.tryMatch(input);
+        if (stack.isEmpty()) return;
+
         com.tomkestookit.FakeCraftMarker.mark(stack);
         result.setStack(0, stack);
 

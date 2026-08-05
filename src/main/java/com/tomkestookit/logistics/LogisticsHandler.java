@@ -48,8 +48,9 @@ public final class LogisticsHandler {
     public static java.util.Set<UUID> collectAliveMarkerUuids() {
         java.util.Set<UUID> set = new java.util.HashSet<>();
         for (LogisticsPair pair : LogisticsTracker.all()) {
-            addUuid(set, pair.a);
-            addUuid(set, pair.b);
+            for (LogisticsPair.Endpoint e : pair.endpoints) {
+                addUuid(set, e);
+            }
         }
         return set;
     }
@@ -80,15 +81,17 @@ public final class LogisticsHandler {
             LogisticsPair pair = LogisticsTracker.findByPos(dim, pos);
             if (pair == null) return true;
 
-            // 创造模式：不掉物品，但仍要清 pair
             if (!player.isCreative()) {
-                // 两端都掉带 pairId 的物流终端 stack（保留身份）
+                // 掉落带 pairId 的物流终端 stack（保留身份）
                 ItemStack drop = buildResultForExistingPair(pair.pairId);
                 net.minecraft.block.Block.dropStack(sw, pos, drop);
 
-                // 内部物品：因为两端 tick 实时同步，两个 barrel 的 27 格内容一致。
-                // 挖任一端就把两端 inventory 都清空，只掉一次内容物，避免复制。
-                dumpContentsOnce(sw, pos, be, pair);
+                // 只有当这是该编号最后一个终端时，才掉落内容物
+                boolean isLastEndpoint = pair.endpoints.size() <= 1;
+                if (isLastEndpoint) {
+                    dumpContentsOnce(sw, pos, be, pair);
+                }
+                // 不是最后一个：不掉内容物，其它终端继续共享该库存
             }
 
             // 清 pair 端点 + marker
@@ -148,8 +151,7 @@ public final class LogisticsHandler {
         clearInventory(local);
         clearInventory(remote);
         // 清同步快照，避免下 tick sync 把 stale 状态又写回
-        LAST_A.remove(pair.pairId);
-        LAST_B.remove(pair.pairId);
+        LAST_SNAPSHOTS.remove(pair.pairId);
     }
 
     private static boolean isEmpty(BarrelBlockEntity be) {
@@ -196,6 +198,20 @@ public final class LogisticsHandler {
             lore.add(NbtString.of(Text.Serializer.toJson(
                 Text.literal(line).styled(s -> s.withItalic(false)))));
         }
+        display.put("Lore", lore);
+        nbt.put("display", display);
+        return stack;
+    }
+
+    /** 复制合成结果：生成 1 个同 pairId 的物流终端。*/
+    public static ItemStack buildResultForCopy(String pairId) {
+        ItemStack stack = buildResultForExistingPair(pairId);
+        // lore 追加复制说明
+        NbtCompound nbt = stack.getOrCreateNbt();
+        NbtCompound display = nbt.getCompound("display");
+        NbtList lore = display.contains("Lore") ? display.getList("Lore", 8) : new NbtList();
+        lore.add(NbtString.of(Text.Serializer.toJson(
+            Text.literal("§a复制终端 §8- 与原终端互通").styled(s -> s.withItalic(false)))));
         display.put("Lore", lore);
         nbt.put("display", display);
         return stack;
@@ -255,37 +271,26 @@ public final class LogisticsHandler {
         LogisticsPair pair = LogisticsTracker.get(pairId);
         String dim = world.getRegistryKey().getValue().toString();
         LogisticsPair.Endpoint newEnd = new LogisticsPair.Endpoint(dim, pos.getX(), pos.getY(), pos.getZ());
-        boolean isA;
+
         if (pair == null) {
-            // 全新 pair
             pair = new LogisticsPair(pairId);
-            pair.a = newEnd;
-            isA = true;
-        } else if (pair.a == null) {
-            // A 端曾被破坏，本次补 A
-            pair.a = newEnd;
-            isA = true;
-        } else if (pair.b == null && !pair.a.equalsTo(newEnd)) {
-            // 首次放 B 端
-            pair.b = newEnd;
-            isA = false;
-        } else {
-            // pair 已完整（两端都在）或 重复放置：此方块降级为普通 barrel（不写 BE NBT）
-            return;
         }
+        if (pair.endpoints == null) pair.endpoints = new java.util.ArrayList<>();
+        // 检查该位置是否已经存在
+        if (pair.containsPos(newEnd)) return;
+
+        pair.endpoints.add(newEnd);
         LogisticsTracker.put(pair);
 
-        // 标记 barrel 为 pair 端点。我们不写 BlockEntity NBT 字段（避免 readNbt 覆盖 inventory）；
-        // pair 的归属完全由 LogisticsTracker 按 pos 索引决定，BlockEntity 无需知道自己是哪个 pair 的哪一端。
         BlockEntity be = world.getBlockEntity(pos);
         if (be instanceof BarrelBlockEntity) {
             be.markDirty();
         }
 
-        // Marker
-        UUID markerUuid = LogisticsMarker.create(world, pos, defaultMarkerText(pairId, isA));
-        LogisticsPair.Endpoint self = isA ? pair.a : pair.b;
-        self.markerUuid = markerUuid == null ? null : markerUuid.toString();
+        int idx = pair.endpoints.size();
+        UUID markerUuid = LogisticsMarker.create(world, pos,
+            defaultMarkerText(pairId, idx, pair.endpoints.size()));
+        newEnd.markerUuid = markerUuid == null ? null : markerUuid.toString();
         LogisticsTracker.save();
     }
 
@@ -296,29 +301,27 @@ public final class LogisticsHandler {
                                        net.minecraft.server.network.ServerPlayerEntity player) {
         String dim = world.getRegistryKey().getValue().toString();
         LogisticsPair pair = LogisticsTracker.findByPos(dim, pos);
-        if (pair == null) return true; // 不是我们管的方块，vanilla 正常
-        // 不完整
+        if (pair == null) return true;
         if (!pair.isComplete()) {
-            player.sendMessage(Text.literal("§c[物流终端] 对端尚未放置。").formatted(Formatting.RED), true);
+            player.sendMessage(Text.literal("§c[物流终端] 需要至少 2 个同编号终端。").formatted(Formatting.RED), true);
             return false;
         }
         LogisticsPair.Endpoint self = LogisticsTracker.endpointAt(pair, dim, pos);
-        LogisticsPair.Endpoint other = pair.other(self);
-        if (other == null) return true;
-        // 对端 world / chunk 状态
-        ServerWorld otherWorld = LogisticsMarker.resolveWorld(world.getServer(), other.dim);
-        if (otherWorld == null) {
-            player.sendMessage(Text.literal("§c[物流终端] 对端所在维度不存在。").formatted(Formatting.RED), true);
-            return false;
+        java.util.List<LogisticsPair.Endpoint> others = pair.others(self);
+        // 检查是否至少有一个对端加载
+        boolean anyLoaded = false;
+        for (LogisticsPair.Endpoint other : others) {
+            ServerWorld otherWorld = LogisticsMarker.resolveWorld(world.getServer(), other.dim);
+            if (otherWorld != null && otherWorld.isChunkLoaded(other.x >> 4, other.z >> 4)) {
+                BlockEntity otherBe = otherWorld.getBlockEntity(new BlockPos(other.x, other.y, other.z));
+                if (otherBe instanceof BarrelBlockEntity) {
+                    anyLoaded = true;
+                    break;
+                }
+            }
         }
-        if (!otherWorld.isChunkLoaded(other.x >> 4, other.z >> 4)) {
-            player.sendMessage(Text.literal("§c[物流终端] 对端区块未加载。").formatted(Formatting.RED), true);
-            return false;
-        }
-        // 对端方块是否还是 barrel
-        BlockEntity otherBe = otherWorld.getBlockEntity(new BlockPos(other.x, other.y, other.z));
-        if (!(otherBe instanceof BarrelBlockEntity)) {
-            player.sendMessage(Text.literal("§c[物流终端] 对端方块已丢失。").formatted(Formatting.RED), true);
+        if (!anyLoaded) {
+            player.sendMessage(Text.literal("§c[物流终端] 所有对端均未加载。").formatted(Formatting.RED), true);
             return false;
         }
         return true;
@@ -326,29 +329,38 @@ public final class LogisticsHandler {
 
     // ------------------------------------------------------------------ tick 同步 + marker 状态
 
-    /** 同步用的“上次快照”，用于检测哪端刚变化。*/
-    private static final java.util.Map<String, java.util.List<ItemStack>> LAST_A = new java.util.HashMap<>();
-    private static final java.util.Map<String, java.util.List<ItemStack>> LAST_B = new java.util.HashMap<>();
+    /** 同步用的”上次快照”，按 pairId 存。每个 pairId 存一份 27 格快照。*/
+    private static final java.util.Map<String, java.util.List<ItemStack>> LAST_SNAPSHOTS = new java.util.HashMap<>();
 
     private static void tick(MinecraftServer server) {
         if (!com.tomkestookit.TomkesTookitConfig.enabled("item.logistics_ops")) return;
-        if ((server.getTicks() & 0x1) != 0) return; // 每 2 tick 一次，节流
+        if ((server.getTicks() & 0x1) != 0) return;
 
-        // 遍历拿快照，允许在 sweepBrokenEndpoints 里修改 tracker
         java.util.List<LogisticsPair> snapshot = new java.util.ArrayList<>(LogisticsTracker.all());
         for (LogisticsPair pair : snapshot) {
-            if (pair == null) continue;
-            // 兜底清理：BEFORE 事件没跑到（爆炸/piston/mod 破坏等）导致端点方块没了
-            // 但 marker 还在 —— 这里检测并清理。
+            if (pair == null || pair.endpoints.isEmpty()) continue;
             sweepBrokenEndpoints(server, pair);
-            // 若 pair 已经被 sweep 清空，跳过
-            if (pair.a == null && pair.b == null) continue;
+            if (pair.endpoints.isEmpty()) continue;
 
-            State st = evaluate2(server, pair);
-            updateMarkers(server, pair, st);
-            if (st == State.OK) {
-                syncInventories(server, pair);
+            // 找所有加载且存在的 barrel
+            java.util.List<BarrelBlockEntity> loaded = new java.util.ArrayList<>();
+            int unloadedCount = 0;
+            for (LogisticsPair.Endpoint e : pair.endpoints) {
+                ServerWorld w = LogisticsMarker.resolveWorld(server, e.dim);
+                if (w == null || !w.isChunkLoaded(e.x >> 4, e.z >> 4)) {
+                    unloadedCount++;
+                    continue;
+                }
+                BlockEntity be = w.getBlockEntity(new BlockPos(e.x, e.y, e.z));
+                if (be instanceof BarrelBlockEntity barrel) loaded.add(barrel);
             }
+
+            // 更新所有端的 marker
+            updateAllMarkers(server, pair, unloadedCount);
+
+            // 同步：>=2 个加载端才做
+            if (loaded.size() < 2) continue;
+            syncMulti(pair, loaded);
         }
     }
 
@@ -357,20 +369,22 @@ public final class LogisticsHandler {
      * 未加载不动，避免误判）。发现方块没了就销毁 marker、从 pair 里移除该端。
      */
     private static void sweepBrokenEndpoints(MinecraftServer server, LogisticsPair pair) {
-        if (pair.a != null && shouldSweep(server, pair.a)) {
-            destroyMarker(server, pair.a);
-            pair.a = null;
+        boolean changed = false;
+        var it = pair.endpoints.iterator();
+        while (it.hasNext()) {
+            LogisticsPair.Endpoint e = it.next();
+            if (shouldSweep(server, e)) {
+                destroyMarker(server, e);
+                it.remove();
+                changed = true;
+            }
         }
-        if (pair.b != null && shouldSweep(server, pair.b)) {
-            destroyMarker(server, pair.b);
-            pair.b = null;
-        }
-        if (pair.a == null && pair.b == null) {
+        if (pair.endpoints.isEmpty()) {
             LogisticsTracker.remove(pair.pairId);
-            LAST_A.remove(pair.pairId);
-            LAST_B.remove(pair.pairId);
+            LAST_SNAPSHOTS.remove(pair.pairId);
+        } else if (changed) {
+            LogisticsTracker.save();
         }
-        // 单端还在的情况下不主动保存，避免每 tick 磁盘 IO
     }
 
     private static boolean shouldSweep(MinecraftServer server, LogisticsPair.Endpoint e) {
@@ -392,59 +406,60 @@ public final class LogisticsHandler {
         LogisticsMarker.sweepAt(server, e.dim, new BlockPos(e.x, e.y, e.z));
     }
 
-    private enum State { OK, INCOMPLETE, OTHER_UNLOADED, OTHER_MISSING }
+    /** 多端同步：用快照比对，找到变化源，向所有端广播。*/
+    private static void syncMulti(LogisticsPair pair, java.util.List<BarrelBlockEntity> loaded) {
+        java.util.List<ItemStack> last = LAST_SNAPSHOTS.get(pair.pairId);
 
-    private static State checkEndpoint(MinecraftServer server, LogisticsPair.Endpoint e) {
-        ServerWorld world = LogisticsMarker.resolveWorld(server, e.dim);
-        if (world == null) return State.OTHER_MISSING;
-        if (!world.isChunkLoaded(e.x >> 4, e.z >> 4)) return State.OTHER_UNLOADED;
-        BlockEntity be = world.getBlockEntity(new BlockPos(e.x, e.y, e.z));
-        if (!(be instanceof BarrelBlockEntity)) return State.OTHER_MISSING;
-        return State.OK;
-    }
-
-    /** State 合并规则：任意一端不 OK 就非 OK，MISSING > UNLOADED > OK。*/
-    private static State and(State a, State b) {
-        if (a == State.OTHER_MISSING || b == State.OTHER_MISSING) return State.OTHER_MISSING;
-        if (a == State.OTHER_UNLOADED || b == State.OTHER_UNLOADED) return State.OTHER_UNLOADED;
-        if (a == State.INCOMPLETE || b == State.INCOMPLETE) return State.INCOMPLETE;
-        return State.OK;
-    }
-
-    // 用 & 的辅助 hack —— 上面 evaluate 里写 `checkEndpoint(a) & checkEndpoint(b)` 是打字省事，
-    // 实际得手动合并，Java 不支持 enum &。改回正常合并：
-    // 这里保留一个方法链接
-    // （见 evaluate2）
-
-    private static State evaluate2(MinecraftServer server, LogisticsPair pair) {
-        if (!pair.isComplete()) return State.INCOMPLETE;
-        return and(checkEndpoint(server, pair.a), checkEndpoint(server, pair.b));
-    }
-
-    private static void updateMarkers(MinecraftServer server, LogisticsPair pair, State real) {
-        Text msgA;
-        Text msgB;
-        switch (real) {
-            case OK -> {
-                msgA = defaultMarkerText(pair.pairId, true);
-                msgB = defaultMarkerText(pair.pairId, false);
+        // 找哪个端变了（第一个不匹配 last 的）
+        BarrelBlockEntity source = null;
+        for (BarrelBlockEntity barrel : loaded) {
+            java.util.List<ItemStack> cur = snapshot(barrel);
+            if (last == null || !stacksEqual(last, cur)) {
+                source = barrel;
+                break;
             }
-            case INCOMPLETE -> {
-                Text t = Text.literal("§c[未配对] §7#§f" + pair.pairId);
-                msgA = t; msgB = t;
-            }
-            case OTHER_UNLOADED -> {
-                Text t = Text.literal("§c[对端未加载] §7#§f" + pair.pairId);
-                msgA = t; msgB = t;
-            }
-            case OTHER_MISSING -> {
-                Text t = Text.literal("§c[对端丢失] §7#§f" + pair.pairId);
-                msgA = t; msgB = t;
-            }
-            default -> { msgA = Text.empty(); msgB = Text.empty(); }
         }
-        maintainMarker(server, pair, pair.a, msgA);
-        maintainMarker(server, pair, pair.b, msgB);
+        if (source == null) {
+            // 没有端变化，但检查是否一致（首次 tick 或首次加载）
+            java.util.List<ItemStack> first = snapshot(loaded.get(0));
+            for (int i = 1; i < loaded.size(); i++) {
+                if (!stacksEqual(first, snapshot(loaded.get(i)))) {
+                    source = loaded.get(0); // 不一致，以第一个为源
+                    break;
+                }
+            }
+        }
+        if (source == null) {
+            // 全部一致且没变化
+            LAST_SNAPSHOTS.put(pair.pairId, snapshot(loaded.get(0)));
+            return;
+        }
+
+        // 把 source 广播到所有其它加载端
+        for (BarrelBlockEntity barrel : loaded) {
+            if (barrel == source) continue;
+            copy(source, barrel);
+            barrel.markDirty();
+        }
+        LAST_SNAPSHOTS.put(pair.pairId, snapshot(source));
+    }
+
+    private static void updateAllMarkers(MinecraftServer server, LogisticsPair pair, int unloadedCount) {
+        int total = pair.endpoints.size();
+        for (int i = 0; i < total; i++) {
+            LogisticsPair.Endpoint e = pair.endpoints.get(i);
+            Text text;
+            if (total < 2) {
+                text = Text.literal("§c[未配对] §7#§f" + pair.pairId);
+            } else if (unloadedCount > 0) {
+                text = Text.literal(String.format("§b终端 §7#§f%s §8[%d/%d] §c%d 未加载",
+                    pair.pairId, i + 1, total, unloadedCount));
+            } else {
+                text = Text.literal(String.format("§b终端 §7#§f%s §8[%d/%d]",
+                    pair.pairId, i + 1, total));
+            }
+            maintainMarker(server, pair, e, text);
+        }
     }
 
     /** 确保 endpoint 上的盔甲架存在且文本一致；不在则尝试重建。*/
@@ -471,45 +486,7 @@ public final class LogisticsHandler {
     }
 
     /** 两端同步。以 A 为主，比较 last snapshot：谁变了拷谁到对端。冲突时 A 优先。*/
-    private static void syncInventories(MinecraftServer server, LogisticsPair pair) {
-        ServerWorld wa = LogisticsMarker.resolveWorld(server, pair.a.dim);
-        ServerWorld wb = LogisticsMarker.resolveWorld(server, pair.b.dim);
-        if (wa == null || wb == null) return;
-        if (!(wa.getBlockEntity(new BlockPos(pair.a.x, pair.a.y, pair.a.z)) instanceof BarrelBlockEntity bea)) return;
-        if (!(wb.getBlockEntity(new BlockPos(pair.b.x, pair.b.y, pair.b.z)) instanceof BarrelBlockEntity beb)) return;
-
-        // 判断哪端刚变化：与上次快照比较
-        java.util.List<ItemStack> curA = snapshot(bea);
-        java.util.List<ItemStack> curB = snapshot(beb);
-        java.util.List<ItemStack> lastA = LAST_A.get(pair.pairId);
-        java.util.List<ItemStack> lastB = LAST_B.get(pair.pairId);
-
-        boolean aChanged = lastA == null || !stacksEqual(lastA, curA);
-        boolean bChanged = lastB == null || !stacksEqual(lastB, curB);
-
-        if (aChanged && !bChanged) {
-            copy(bea, beb);
-            beb.markDirty();
-            curB = snapshot(beb);
-        } else if (bChanged && !aChanged) {
-            copy(beb, bea);
-            bea.markDirty();
-            curA = snapshot(bea);
-        } else if (aChanged) {
-            // 双端都变 → 冲突：A 优先
-            copy(bea, beb);
-            beb.markDirty();
-            curB = snapshot(beb);
-        } else if (!stacksEqual(curA, curB)) {
-            // 未变但不同（首次 tick）：以 A 为主同步 B
-            copy(bea, beb);
-            beb.markDirty();
-            curB = snapshot(beb);
-        }
-
-        LAST_A.put(pair.pairId, curA);
-        LAST_B.put(pair.pairId, curB);
-    }
+    // (已被 syncMulti 替代，保留方法签名以防编译依赖)
 
     private static java.util.List<ItemStack> snapshot(Inventory inv) {
         java.util.ArrayList<ItemStack> list = new java.util.ArrayList<>(inv.size());
@@ -544,18 +521,14 @@ public final class LogisticsHandler {
                 LogisticsMarker.remove(server, broken.dim, UUID.fromString(broken.markerUuid));
             } catch (IllegalArgumentException ignored) {}
         }
-        // 兜底扫描：按位置清理原地的 marker，防 UUID 不匹配残留
         LogisticsMarker.sweepAt(server, dim, pos);
 
-        // 从 pair 里去掉这端
-        if (pair.a != null && pair.a.equalsTo(broken)) pair.a = null;
-        else if (pair.b != null && pair.b.equalsTo(broken)) pair.b = null;
+        // 从 pair 端点列表里去掉这端
+        if (broken != null) pair.endpoints.remove(broken);
 
-        // 如果两端都没了：整个 pair 移除
-        if (pair.a == null && pair.b == null) {
+        if (pair.endpoints.isEmpty()) {
             LogisticsTracker.remove(pair.pairId);
-            LAST_A.remove(pair.pairId);
-            LAST_B.remove(pair.pairId);
+            LAST_SNAPSHOTS.remove(pair.pairId);
         } else {
             LogisticsTracker.save();
         }
@@ -563,7 +536,7 @@ public final class LogisticsHandler {
 
     // ------------------------------------------------------------------ helpers
 
-    private static Text defaultMarkerText(String pairId, boolean isA) {
-        return Text.literal(String.format("§b物流终端 §7#§f%s §8(%s)", pairId, isA ? "A" : "B"));
+    private static Text defaultMarkerText(String pairId, int index, int total) {
+        return Text.literal(String.format("§b终端 §7#§f%s §8[%d/%d]", pairId, index, total));
     }
 }

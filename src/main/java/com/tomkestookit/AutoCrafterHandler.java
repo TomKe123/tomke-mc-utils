@@ -253,7 +253,7 @@ public final class AutoCrafterHandler {
             // vanilla 未识别时 fallback 到本 mod 的魔改配方链
             result = SpecialCraftingCatalog.tryMatch(input);
         }
-        if (result.isEmpty() || !canInsertOutput(inv, result)) {
+        if (result.isEmpty() || !canInsertOutput(inv, result, config)) {
             updateStatus(world, config, "异常");
             return false;
         }
@@ -287,7 +287,7 @@ public final class AutoCrafterHandler {
             }
         }
 
-        insertOutput(inv, result.copy());
+        insertOutput(inv, result.copy(), config, world);
         inv.markDirty();
         config.flashTicks = world.getServer().getTicks() + 6;
         updateStatus(world, config, "工作");
@@ -311,7 +311,8 @@ public final class AutoCrafterHandler {
         return slot == 9;
     }
 
-    private static boolean canInsertOutput(Inventory inv, ItemStack result) {
+    private static boolean canInsertOutput(Inventory inv, ItemStack result, AutoCrafterTracker.Config config) {
+        if (isEjectMode(config)) return true; // 弹出模式：不受内部输出格限制
         ItemStack target = inv.getStack(9);
         if (target.isEmpty()) return result.getCount() <= result.getMaxCount();
         if (!ItemStack.canCombine(target, result)) return false;
@@ -319,13 +320,71 @@ public final class AutoCrafterHandler {
         return space >= result.getCount();
     }
 
-    private static void insertOutput(Inventory inv, ItemStack stack) {
+    private static void insertOutput(Inventory inv, ItemStack stack,
+                                     AutoCrafterTracker.Config config, ServerWorld world) {
+        if (isEjectMode(config)) {
+            ejectOutput(world, config, stack);
+            return;
+        }
         ItemStack target = inv.getStack(9);
         if (target.isEmpty()) {
             inv.setStack(9, stack.copy());
         } else if (ItemStack.canCombine(target, stack)) {
             target.increment(stack.getCount());
         }
+    }
+
+    private static boolean isEjectMode(AutoCrafterTracker.Config config) {
+        String dir = config == null ? null : config.ejectDirection;
+        return dir != null && !dir.isBlank() && !"none".equalsIgnoreCase(dir);
+    }
+
+    private static net.minecraft.util.math.Direction parseDirection(String key) {
+        if (key == null) return null;
+        return switch (key.toLowerCase()) {
+            case "up" -> net.minecraft.util.math.Direction.UP;
+            case "down" -> net.minecraft.util.math.Direction.DOWN;
+            case "north" -> net.minecraft.util.math.Direction.NORTH;
+            case "south" -> net.minecraft.util.math.Direction.SOUTH;
+            case "east" -> net.minecraft.util.math.Direction.EAST;
+            case "west" -> net.minecraft.util.math.Direction.WEST;
+            default -> null;
+        };
+    }
+
+    /**
+     * 从选定方向把产物直接以 ItemEntity 的形式弹出：
+     *   - 出生点：方块中心 + 方向单位向量 * 0.6
+     *   - 初速度：方向单位向量 * 0.2（up/down 更明显）
+     */
+    private static void ejectOutput(ServerWorld world, AutoCrafterTracker.Config config, ItemStack stack) {
+        net.minecraft.util.math.Direction dir = parseDirection(config.ejectDirection);
+        if (dir == null) return;
+        BlockPos pos = AutoCrafterTracker.pos(config);
+        double cx = pos.getX() + 0.5;
+        double cy = pos.getY() + 0.5;
+        double cz = pos.getZ() + 0.5;
+        double dx = dir.getOffsetX();
+        double dy = dir.getOffsetY();
+        double dz = dir.getOffsetZ();
+        // 出生点略微偏出方块，避免立刻卡在方块中间
+        double spawnX = cx + dx * 0.6;
+        double spawnY = cy + dy * 0.6;
+        double spawnZ = cz + dz * 0.6;
+        net.minecraft.entity.ItemEntity entity = new net.minecraft.entity.ItemEntity(
+            world, spawnX, spawnY, spawnZ, stack.copy());
+        double horiz = 0.2;
+        double vertUp = 0.3;
+        double vertDown = -0.1;
+        double vx = dx * horiz;
+        double vz = dz * horiz;
+        double vy;
+        if (dir == net.minecraft.util.math.Direction.UP) vy = vertUp;
+        else if (dir == net.minecraft.util.math.Direction.DOWN) vy = vertDown;
+        else vy = 0.1;
+        entity.setVelocity(vx, vy, vz);
+        entity.setPickupDelay(10);
+        world.spawnEntity(entity);
     }
 
     public static ItemStack buttonStack(String triggerMode) {

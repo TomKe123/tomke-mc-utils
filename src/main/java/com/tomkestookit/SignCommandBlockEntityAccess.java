@@ -6,4 +6,8 @@ package com.tomkestookit;
 public interface SignCommandBlockEntityAccess {
     String tomkestookit$getCommand();
     void tomkestookit$setCommand(String command);
+    String tomkestookit$getTaskGroup();
+    void tomkestookit$setTaskGroup(String taskGroup);
+    String tomkestookit$getTaskGroupName();
+    void tomkestookit$setTaskGroupName(String taskGroupName);
 }
