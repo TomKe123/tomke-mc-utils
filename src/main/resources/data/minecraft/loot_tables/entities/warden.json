@@ -8,7 +8,11 @@
           "type": "minecraft:item",
           "name": "minecraft:echo_shard",
           "functions": [
-            { "function": "minecraft:set_count", "count": { "min": 1, "max": 3 } }
+            { "function": "minecraft:set_count", "count": { "min": 1, "max": 3 } },
+            {
+              "function": "minecraft:looting_enchant",
+              "count": { "min": 0, "max": 1 }
+            }
           ]
         }
       ]
@@ -20,7 +24,11 @@
           "type": "minecraft:item",
           "name": "minecraft:sculk_catalyst",
           "functions": [
-            { "function": "minecraft:set_count", "count": { "min": 1, "max": 2 } }
+            { "function": "minecraft:set_count", "count": { "min": 1, "max": 2 } },
+            {
+              "function": "minecraft:looting_enchant",
+              "count": { "min": 0, "max": 1 }
+            }
           ]
         }
       ]
@@ -28,7 +36,7 @@
     {
       "rolls": 1,
       "conditions": [
-        { "condition": "minecraft:random_chance", "chance": 0.35 }
+        { "condition": "minecraft:random_chance_with_looting", "chance": 0.35, "looting_multiplier": 0.05 }
       ],
       "entries": [
         {
@@ -42,24 +50,27 @@
         {
           "type": "minecraft:item",
           "name": "minecraft:music_disc_cat",
-          "weight": 25
+          "weight": 25,
+          "quality": 2
         },
         {
           "type": "minecraft:item",
           "name": "minecraft:music_disc_13",
-          "weight": 25
+          "weight": 25,
+          "quality": 2
         },
         {
           "type": "minecraft:item",
           "name": "minecraft:music_disc_otherside",
-          "weight": 10
+          "weight": 10,
+          "quality": 5
         }
       ]
     },
     {
       "rolls": 1,
       "conditions": [
-        { "condition": "minecraft:random_chance", "chance": 0.2 }
+        { "condition": "minecraft:random_chance_with_looting", "chance": 0.2, "looting_multiplier": 0.05 }
       ],
       "entries": [
         {
@@ -77,6 +88,7 @@
           "type": "minecraft:item",
           "name": "minecraft:enchanted_book",
           "weight": 30,
+          "quality": 2,
           "functions": [
             {
               "function": "minecraft:set_nbt",
@@ -88,6 +100,7 @@
           "type": "minecraft:item",
           "name": "minecraft:enchanted_book",
           "weight": 10,
+          "quality": 5,
           "functions": [
             {
               "function": "minecraft:set_nbt",
@@ -100,7 +113,7 @@
     {
       "rolls": 1,
       "conditions": [
-        { "condition": "minecraft:random_chance", "chance": 0.12 }
+        { "condition": "minecraft:random_chance_with_looting", "chance": 0.12, "looting_multiplier": 0.03 }
       ],
       "entries": [
         {
@@ -111,22 +124,26 @@
         {
           "type": "minecraft:item",
           "name": "minecraft:silence_armor_trim_smithing_template",
-          "weight": 20
+          "weight": 20,
+          "quality": 4
         }
       ]
     },
     {
       "rolls": 1,
-      "conditions": [
-        { "condition": "minecraft:random_chance", "chance": 0.15 }
-      ],
       "entries": [
+        { "type": "minecraft:empty", "weight": 85 },
         {
           "type": "minecraft:item",
           "name": "minecraft:enchanted_golden_apple",
-          "weight": 100,
+          "weight": 15,
+          "quality": 3,
           "functions": [
-            { "function": "minecraft:set_count", "count": { "min": 1, "max": 2 } }
+            { "function": "minecraft:set_count", "count": { "min": 1, "max": 2 } },
+            {
+              "function": "minecraft:looting_enchant",
+              "count": { "min": 0, "max": 1 }
+            }
           ]
         }
       ]
