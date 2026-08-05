@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 @Mixin(AnvilScreenHandler.class)
 public class AnvilCostCapMixin {
 
-    private static final int NEW_CAP = 100;
+    private static final int NEW_CAP = 10000;
 
     @ModifyConstant(
         method = "updateResult",

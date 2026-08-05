@@ -59,11 +59,12 @@ public final class AdminFeature {
         // ---------- 配方 ----------
         add("recipe.greed_potion",       "贪婪之瓶",         Items.EMERALD_BLOCK, Group.RECIPE, "8 绿宝石块 + 1 空瓶 → 100 分钟 BAD_OMEN");
         add("recipe.sugar_tnt",          "大伊万",           Items.TNT,           Group.RECIPE, "8 糖 + 中心 TNT → 4× 威力附魔 TNT");
-        add("recipe.saturation_potion",  "面包精华",         Items.BREAD,         Group.RECIPE, "9 面包 → 永久滋养喷溅药水");
+        add("recipe.saturation_potion",  "面包精华",         Items.BREAD,         Group.RECIPE, "9 面包 → 永久饱和喷溅药水");
         add("recipe.region_clearer",     "区域清除斧配方",   Items.IRON_PICKAXE,  Group.RECIPE, "中心铁镐 + 8 材质 → 对应 tier 清除斧");
         add("recipe.region_filler",      "附魔水/岩浆桶配方",Items.WATER_BUCKET,  Group.RECIPE, "9 水桶 / 9 岩浆桶 → 附魔桶");
         add("recipe.logistics",          "物流终端配方",     Items.LODESTONE,     Group.RECIPE, "8 铁块 + 中心磁石 → 一对物流桶");
         add("recipe.auto_crafter",       "自动合成器配方",   Items.CRAFTING_TABLE,Group.RECIPE, "中心工作台 + 4 铁 + 4 红石 → 自动合成器");
+        add("recipe.trinket",            "饰品配方",         Items.ENDER_EYE,    Group.RECIPE, "8 种饰品的 3×3 合成");
 
         // ---------- 物品交互 ----------
         add("item.antigrav_boots",       "反重力靴",         Items.LEATHER_BOOTS, Group.ITEM, "跳跃 II、摔落减伤 75%、速度 ×3、铁砧转移");
@@ -79,6 +80,10 @@ public final class AdminFeature {
         add("item.sign_command",         "告示牌绑命令",     Items.OAK_SIGN,      Group.ITEM, "shift+F 手持告示牌 → 聊天输入命令 → 放下即封");
         add("item.veinmine",             "连锁采集",         Items.DIAMOND_PICKAXE,Group.ITEM,"shift+挖 → BFS 连锁，补树苗");
         add("item.entity_capture",       "生物收纳",         Items.EGG,           Group.ITEM, "shift+右键生物装进对应刷怪蛋");
+        add("item.trinket",             "饰品系统",         Items.ENDER_EYE,     Group.ITEM, "27 格饰品袋 + 被动效果 + 菜单入口");
+        add("item.reforge",             "重铸石系统",       Items.ANVIL,         Group.ITEM, "铁砧 + 重铸石给装备追加属性");
+        add("item.boss_token",          "Boss 召唤令牌",    Items.WITHER_SKELETON_SKULL, Group.ITEM, "手持召唤令牌右键地面 → 3s 吟唱召唤精英 Boss");
+        add("item.original_weapon",     "原创武器",         Items.NETHERITE_SWORD, Group.ITEM, "血月镰刀 / 灵魂收割者 / 深渊三叉戟 / 虚空之刃合成 + 特效");
 
         // ---------- 命令 ----------
         add("cmd.fly",                   "/fly 飞行",        Items.FEATHER,       Group.COMMAND, "消耗经验换飞行时间");
@@ -87,6 +92,7 @@ public final class AdminFeature {
         add("cmd.veinmine_toggle",       "/veinmine 命令",   Items.NAME_TAG,      Group.COMMAND, "toggle 与白名单管理");
         add("cmd.gamemode_shortcut",     "!c / !s 聊天前缀", Items.PAPER,         Group.COMMAND, "旁观 ↔ 生存 快捷切换");
         add("cmd.menu",                  "/cd 与 shift+F",   Items.CLOCK,         Group.COMMAND, "菜单入口");
+        add("cmd.command_task",         "任务组 / 自启",    Items.REPEATER,      Group.COMMAND, "把命令告示牌组装成任务组，并做开机自启指令集");
 
         // ---------- 生物 &amp; 世界 ----------
         add("world.bot_anchor",          "假人相关",         Items.ARMOR_STAND,   Group.WORLD, "锚点、无击退、免伤真玩家、tab 前缀、交互菜单");
@@ -95,6 +101,11 @@ public final class AdminFeature {
         add("world.afk",                 "AFK 显示与免幻翼", Items.CLOCK,         Group.WORLD, "60 秒不动加 [AFK]，幻翼伤害归零");
         add("world.sleep_percentage",    "1 人睡觉跳夜",     Items.RED_BED,       Group.WORLD, "启服写 gamerule；关掉后需要 /gamerule 手动改回");
         add("world.spawn_protection",    "传送/重生无敌",    Items.SHIELD,        Group.WORLD, "5 秒 RESISTANCE IV + 防火");
+        add("world.per_player_spawn",   "每玩家刷怪配额",   Items.ZOMBIE_HEAD,   Group.WORLD, "自然刷怪 cap 按最近玩家独立计算");
+        add("world.item_cleanup_timer", "定时清理掉落物",   Items.CLOCK,         Group.WORLD, "每 30 分钟清理当前维度掉落物，提前 1 分钟 bossbar 提醒");
+        add("world.item_cleanup_lag",   "卡顿清理掉落物",   Items.HOPPER,        Group.WORLD, "当前维度掉落物过多且 MSPT 偏高时，提前 10 秒 bossbar 提醒后清理");
+        add("world.armor_stand_durable","盔甲架耐久增强",   Items.ARMOR_STAND,   Group.WORLD, "盔甲架需要连续攻击 5 次才会破坏，横扫只算 1 次");
+        add("world.elite_mobs",         "精英怪系统",       Items.WITHER_SKELETON_SKULL, Group.WORLD, "野外自然生成的敌对生物按玩家实力概率精英化，掉落饰品/重铸石");
 
         // ---------- UI ----------
         add("ui.sidebar",                "侧栏 TPS/MSPT",    Items.OAK_SIGN,      Group.UI, "每秒刷新");
