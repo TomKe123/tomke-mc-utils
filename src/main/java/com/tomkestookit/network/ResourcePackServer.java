@@ -130,12 +130,26 @@ public final class ResourcePackServer {
                 for (String line : Files.readAllLines(p)) {
                     if (line.startsWith(key + "=")) {
                         String v = line.substring(key.length() + 1).trim();
-                        if (!v.isEmpty()) return v;
+                        if (!v.isEmpty()) return unescape(v);
                     }
                 }
             }
         } catch (IOException ignored) {}
         return null;
+    }
+
+    /** Java properties 反转义：\: → :，\= → =，\\ → \ */
+    private static String unescape(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                sb.append(s.charAt(++i));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private static void writeProp(List<String> lines, String key, String val) {
