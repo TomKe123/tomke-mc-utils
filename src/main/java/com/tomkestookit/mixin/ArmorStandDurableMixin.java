@@ -9,18 +9,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 加大盔甲架耐久：横扫 / 高攻速 / 高伤害玩家无法秒杀盔甲架。
- *
- * 原版盔甲架：两次连续命中（间隔 ≤5 tick）触发完整破坏序列。
- * 修改：玩家必须在 HIT_DECAY_TICKS 内连续命中 HITS_REQUIRED 次。
- * 同一 tick 的多次攻击（横扫误伤）只计一次。
- *
- * 达到阈值时，预设 lastHitTime 让 vanilla 认为"第二次快速命中"条件成立，
- * 然后不取消当前调用——vanilla 自己执行完整破坏（掉落 + 粒子 + 音效 + kill）。
- * 这样无论玩家伤害多高，都需要连续命中 5 次才能拆掉盔甲架。
- *
- * 不影响创造模式、爆炸等非玩家攻击。
+ * 盔甲架仅斧子可拆：不是斧子 → 完全挡掉（不掉耐久、不破坏、只播音效）。
+ * 是斧子 → 还需连续命中 HITS_REQUIRED 次（同一 tick 只计一次，60 tick 衰减）。
  */
+
 @Mixin(ArmorStandEntity.class)
 public abstract class ArmorStandDurableMixin {
 
@@ -45,10 +37,19 @@ public abstract class ArmorStandDurableMixin {
 
             // marker 盔甲架（Invulnerable=true）或创造模式攻击：走原版
             if (self.isInvulnerable()) return;
-            if (source.getAttacker() instanceof net.minecraft.entity.player.PlayerEntity p && p.isCreative()) return;
+            if (source.getAttacker() instanceof net.minecraft.entity.player.PlayerEntity player && player.isCreative())
+                return;
 
             // 非玩家攻击（爆炸、仙人掌等）走原版
-            if (!(source.getAttacker() instanceof net.minecraft.entity.player.PlayerEntity)) return;
+            if (!(source.getAttacker() instanceof net.minecraft.entity.player.PlayerEntity player2)) return;
+
+            // 不是斧子 → 完全阻挡
+            if (!(player2.getMainHandStack().getItem() instanceof net.minecraft.item.AxeItem)) {
+                self.playSound(net.minecraft.sound.SoundEvents.BLOCK_ANVIL_PLACE, 0.5f, 1.0f);
+                self.playSound(net.minecraft.sound.SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(), 0.8f, 0.8f);
+                cir.setReturnValue(true);
+                return;
+            }
 
             long currentTick = self.getWorld().getTime();
             long timeSinceLastHit = currentTick - tomkestookit$lastHitTime;
@@ -65,18 +66,16 @@ public abstract class ArmorStandDurableMixin {
             }
             tomkestookit$lastHitTime = currentTick;
 
-            // 计数未达到要求 → 阻挡伤害，播放音效反馈
+            // 计数未达到要求 → 阻挡伤害，播放斧子砍木声反馈
             if (tomkestookit$hitCount < HITS_REQUIRED) {
                 self.playSound(net.minecraft.sound.SoundEvents.ENTITY_ARMOR_STAND_HIT, 0.5f, 1.0f);
-                cir.setReturnValue(true); // true = 横扫可继续传播到背后生物
+                cir.setReturnValue(true);
                 return;
             }
 
-            // 计数达标 → 预设 lastHitTime 让 vanilla 认为已有"首次命中"，
-            // 不取消调用 → vanilla damage() 看到 (currentTick - lastHitTime <= 5) 为 true → 执行完整破坏
+            // 计数达标 → 放行 vanilla damage() 完成完整破坏
             tomkestookit$hitCount = 0;
             self.lastHitTime = currentTick;
-            // 不调用 cir.cancel / cir.setReturnValue → 继续执行 vanilla damage()
         } catch (Throwable ignored) {}
     }
 }

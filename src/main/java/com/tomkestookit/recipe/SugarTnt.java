@@ -76,6 +76,10 @@ public final class SugarTnt {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.RARE,
+            "3×3 合成 §8· §71 TNT + 8 白糖");
         return stack;
     }
 

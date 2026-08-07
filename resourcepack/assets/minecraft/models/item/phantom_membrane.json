@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/phantom_membrane"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100003}, "model": "tomkestookit:item/reforge/swift_fang"},
+    {"predicate": {"custom_model_data": 100013}, "model": "tomkestookit:item/reforge/antigrav_boots"},
+    {"predicate": {"custom_model_data": 200003}, "model": "tomkestookit:item/trinket/nightwing_charm"}
+  ]
+}

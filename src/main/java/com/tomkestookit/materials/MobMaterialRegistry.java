@@ -87,6 +87,9 @@ public final class MobMaterialRegistry {
         ItemStack stack = new ItemStack(def.icon(), count);
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putString(NBT_KEY, def.id());
+        // CustomModelData 用于资源包贴图识别
+        int cmd = CustomModelDataRegistry.forMaterial(def.id());
+        if (cmd != 0) nbt.putInt("CustomModelData", cmd);
         stack.setCustomName(Text.literal(def.rarity() + "§l" + def.name())
             .styled(s -> s.withItalic(false)));
 
@@ -100,6 +103,29 @@ public final class MobMaterialRegistry {
             Text.literal("§8怪物专属素材").styled(s -> s.withItalic(false)))));
         display.put("Lore", lore);
         nbt.put("display", display);
+
+        // 追加品质 + 获取途径
+        ItemQualityTag.Quality q = switch (def.rarity()) {
+            case "§5" -> ItemQualityTag.Quality.LEGENDARY;
+            case "§c" -> ItemQualityTag.Quality.EPIC;
+            case "§e" -> ItemQualityTag.Quality.RARE;
+            case "§a" -> ItemQualityTag.Quality.UNCOMMON;
+            default -> ItemQualityTag.Quality.COMMON;
+        };
+        ItemQualityTag.append(stack, q, materialSource(def.id()));
+
         return stack;
+    }
+
+    private static String materialSource(String id) {
+        return switch (id) {
+            case "corrupt_sinew" -> "T1-T2 精英怪掉落";
+            case "abyssal_shard" -> "T2-T3 精英怪（水下）掉落";
+            case "soul_crystal" -> "T2-T3 亡灵/尸壳类精英怪掉落";
+            case "stardust" -> "T3-T4 精英怪（月圆之夜加成）掉落";
+            case "blood_moon_essence" -> "T4-T5 精英怪（血月之夜）掉落";
+            case "void_core" -> "T5 精英怪 / Boss 掉落";
+            default -> "精英怪掉落";
+        };
     }
 }

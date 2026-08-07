@@ -1,5 +1,6 @@
 package com.tomkestookit.menu;
 
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 
@@ -16,7 +17,7 @@ import java.util.function.Supplier;
  *
  * 每条包含：
  *   - resultSupplier 构造产物示意 ItemStack（真实结果构造类同款）
- *   - grid[0..8]     3×3 图示，每格一个物品作为 icon（空格填 AIR/玻璃板）
+ *   - grid[0..8]     3×3 图示，每格一个 ItemStack（支持 NBT 自定义物品）
  *   - description    Lore 描述
  *
  * 链式跳转（gridLinks）：
@@ -27,15 +28,30 @@ import java.util.function.Supplier;
  */
 public record SpecialRecipeEntry(String key,
                                  Supplier<ItemStack> resultSupplier,
-                                 net.minecraft.item.Item[] grid,
+                                 ItemStack[] grid,
                                  List<String> description) {
     public SpecialRecipeEntry {
         if (grid.length != 9) throw new IllegalArgumentException("grid must be 9");
     }
 
+    /** 便捷构造：从 Item[] 自动转为 ItemStack[]（向后兼容普通配方）。*/
+    public SpecialRecipeEntry(String key, Supplier<ItemStack> resultSupplier,
+                              Item[] items, List<String> description) {
+        this(key, resultSupplier, toStacks(items), description);
+    }
+
     public ItemStack gridStack(int i) {
-        if (grid[i] == null || grid[i] == Items.AIR) return ItemStack.EMPTY;
-        return new ItemStack(grid[i]);
+        if (grid[i] == null || grid[i].isEmpty()) return ItemStack.EMPTY;
+        return grid[i].copy();
+    }
+
+    private static ItemStack[] toStacks(Item[] items) {
+        ItemStack[] stacks = new ItemStack[items.length];
+        for (int i = 0; i < items.length; i++) {
+            stacks[i] = (items[i] == null || items[i] == Items.AIR)
+                ? ItemStack.EMPTY : new ItemStack(items[i]);
+        }
+        return stacks;
     }
 
     // ---- 静态 side-map：<recipe key, <slot idx, target key>> ----

@@ -99,19 +99,7 @@ public final class EliteSkillRegistry {
             }
         ));
 
-        // 4. heal_pulse (T3, cooldown 600t, windup 12t)
-        ALL.add(new EliteSkill("heal_pulse", 600, 12, 3,
-            ctx -> ctx.attacker().getHealth() <= ctx.attacker().getMaxHealth() * 0.5f,
-            ctx -> {
-                ServerWorld world = ctx.world();
-                MobEntity mob = ctx.attacker();
-                world.spawnParticles(ParticleTypes.HEART, mob.getX(), mob.getY() + 1.5, mob.getZ(), 8, 0.5, 0.5, 0.5, 0.02);
-            },
-            ctx -> {
-                MobEntity mob = ctx.attacker();
-                mob.setHealth(Math.min(mob.getMaxHealth(), mob.getHealth() + mob.getMaxHealth() * 0.2f));
-            }
-        ));
+        // heal_pulse 已删除：精英怪不允许自愈（除 BUFF 外）
 
         // 5. blink_strike (T4, cooldown 240t, windup 6t)
         ALL.add(new EliteSkill("blink_strike", 240, 6, 4,
@@ -203,12 +191,12 @@ public final class EliteSkillRegistry {
                 mob.writeCustomDataToNbt(nbt);
                 nbt.putLong("TomkesTookitEliteShield", shieldEnd);
                 mob.readCustomDataFromNbt(nbt);
-                // Append shield indicator to custom name
+                // Append shield indicator to custom name（短标记）
                 Text currentName = mob.getCustomName();
                 if (currentName != null) {
                     String nameStr = currentName.getString();
-                    if (!nameStr.contains("[🛡]")) {
-                        mob.setCustomName(Text.literal(nameStr + " §b[🛡]"));
+                    if (!nameStr.contains("🛡")) {
+                        mob.setCustomName(Text.literal(nameStr + " §b🛡"));
                     }
                 }
             }

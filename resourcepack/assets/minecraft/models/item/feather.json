@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/feather"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100006}, "model": "tomkestookit:item/reforge/featherweight_gem"}
+  ]
+}

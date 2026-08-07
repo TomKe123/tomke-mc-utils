@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/experience_bottle"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100012}, "model": "tomkestookit:item/reforge/soul_mend"}
+  ]
+}

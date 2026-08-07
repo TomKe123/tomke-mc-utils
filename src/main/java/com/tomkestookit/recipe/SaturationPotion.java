@@ -63,6 +63,9 @@ public final class SaturationPotion {
         display.put("Lore", lore);
         nbt.put("display", display);
 
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.UNCOMMON,
+            "3×3 合成 §8· §79 面包");
         return stack;
     }
 }

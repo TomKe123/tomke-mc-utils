@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "tomkestookit:item/weapon/abyssal_trident"
+  }
+}

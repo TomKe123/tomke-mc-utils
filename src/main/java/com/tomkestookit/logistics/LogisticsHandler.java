@@ -200,6 +200,9 @@ public final class LogisticsHandler {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.EPIC,
+            "3×3 合成 §8· §7铁块 + 磁石（一次出 2 个）");
         return stack;
     }
 
@@ -251,6 +254,9 @@ public final class LogisticsHandler {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.EPIC,
+            "3×3 合成 §8· §7铁块 + 磁石（一次出 2 个）");
         return stack;
     }
 

@@ -64,6 +64,10 @@ public final class InfiniteBucket {
         display.put("Lore", lore);
         nbt.put("display", display);
 
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.RARE,
+            "3×3 合成 §8· §7十字铁块 + 炼药锅 + 桶");
+
         return stack;
     }
 

@@ -4,6 +4,7 @@ import com.tomkestookit.commandtask.CommandTaskRunner;
 import com.tomkestookit.commandtask.CommandTaskStore;
 import com.tomkestookit.landmark.LandmarkCommand;
 import com.tomkestookit.landmark.LandmarkStore;
+import com.tomkestookit.network.ResourcePackServer;
 import com.tomkestookit.trinket.TrinketEffectHandler;
 import com.tomkestookit.trinket.TrinketStore;
 import com.tomkestookit.menu.MenuClock;
@@ -78,6 +79,7 @@ public class TomkesTookitMod implements ModInitializer {
         // 精英怪 + Boss 系统
         com.tomkestookit.elite.EliteMobHandler.register();
         com.tomkestookit.elite.ThreatRating.register();
+        com.tomkestookit.elite.CombatFrenzyTracker.register();
         com.tomkestookit.elite.EliteDebuffAura.register();
         com.tomkestookit.elite.skill.EliteSkillExecutor.register();
         com.tomkestookit.boss.BossSummonHandler.register();
@@ -99,8 +101,6 @@ public class TomkesTookitMod implements ModInitializer {
             com.tomkestookit.logistics.LogisticsTracker.load(server);
             com.tomkestookit.elite.ThreatRating.load(server);
             com.tomkestookit.boss.BossCooldownStore.load(server);
-            // 启动时清一次孤儿：只对已加载 chunk 生效；未加载 chunk 里的 marker
-            // 会在 chunk 加载后由 tick sweep 兜底处理。
             int cleaned = com.tomkestookit.logistics.LogisticsHandler.sweepOrphans(server);
             int cleanedCrafters = AutoCrafterHandler.sweepOrphans(server);
             if (cleaned > 0) {
@@ -109,8 +109,15 @@ public class TomkesTookitMod implements ModInitializer {
             if (cleanedCrafters > 0) {
                 LOGGER.info("[TomkesTookit] 启动时清理 {} 个孤儿自动合成器盔甲架。", cleanedCrafters);
             }
+
+            // 资源包 SHA1 写入 server.properties（URL 来自 server.properties 的 resource-pack-url）
+            ResourcePackServer.start();
+            ResourcePackServer.autoConfigureServer(server);
+
             LOGGER.info("TomkesTookit loaded.");
         });
+
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> ResourcePackServer.stop());
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendKitMessage(handler.player));
     }

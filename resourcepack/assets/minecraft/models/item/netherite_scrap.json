@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/netherite_scrap"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 200021}, "model": "tomkestookit:item/trinket/haste_charm_3"},
+    {"predicate": {"custom_model_data": 200027}, "model": "tomkestookit:item/trinket/abyssal_heart"},
+    {"predicate": {"custom_model_data": 200032}, "model": "tomkestookit:item/trinket/totem_heart"}
+  ]
+}

@@ -1,6 +1,7 @@
 package com.tomkestookit.reforge;
 
 import com.tomkestookit.TomkesTookitConfig;
+import com.tomkestookit.mixin.InteractionManagerAccessor;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -9,8 +10,10 @@ import net.minecraft.server.network.ServerPlayerEntity;
 /**
  * 经验汲取（soul_mend）重铸石 tick 逻辑：
  *
- * 每 10 tick (0.5 秒) 扫描玩家全身装备（主手、副手、4 盔甲格），
- * 如果装备上有 soul_mend 属性且有损坏，消耗 1 点 XP 修 1 点耐久。
+ * 每 10 tick (0.5 秒) 扫描玩家 **整个物品栏**（36 主栏 + 副手 + 4 盔甲格），
+ * 如果物品上有 soul_mend 属性且有损坏，消耗 1 点 XP 修 1 点耐久。
+ *
+ * 安全逻辑：如果待修复物品是主手且玩家正在破坏方块，跳过该物品避免打断挖掘。
  *
  * 经验消耗：从 progress 小数减（与 FlyCommand 类似），不够一级时扣等级。
  * 优先修损坏最重的。
@@ -38,27 +41,25 @@ public final class AutoMenderHandler {
             // 没有经验就不处理
             if (player.experienceLevel <= 0 && player.experienceProgress <= 0.0f) continue;
 
-            // 扫描所有装备槽位
-            ItemStack[] equipment = {
-                player.getInventory().getStack(player.getInventory().selectedSlot), // 主手
-                player.getOffHandStack(),                                           // 副手
-                player.getInventory().getStack(36), // 靴
-                player.getInventory().getStack(37), // 腿
-                player.getInventory().getStack(38), // 胸
-                player.getInventory().getStack(39)  // 头
-            };
+            int mainHandSlot = player.getInventory().selectedSlot;
+            boolean isBreaking = ((InteractionManagerAccessor) player.interactionManager).isMining();
 
-            for (ItemStack stack : equipment) {
+            // 扫描整个物品栏：36 主栏 + 副手(40) + 4 盔甲(36-39)
+            for (int slot = 0; slot < 41; slot++) {
+                ItemStack stack = player.getInventory().getStack(slot);
                 if (stack.isEmpty()) continue;
                 if (!stack.isDamageable()) continue;
                 if (!stack.isDamaged()) continue;
                 if (!ReforgeRegistry.alreadyApplied(stack, soulMend)) continue;
 
-                // 找到损坏的且有 soul_mend 的装备 → 修 1 点
+                // 如果是主手物品且玩家正在挖方块，跳过（避免打断挖掘进度）
+                if (slot == mainHandSlot && isBreaking) continue;
+
+                // 找到损坏的且有 soul_mend 的物品 → 修 1 点
                 if (tryConsumeXp(player)) {
                     stack.setDamage(stack.getDamage() - 1);
                 }
-                // 每次 tick 只修一个装备的一点耐久（避免经验消耗太猛）
+                // 每次 tick 只修一个物品的一点耐久（避免经验消耗太猛）
                 break;
             }
         }

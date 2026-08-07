@@ -43,6 +43,8 @@
     "XpMultiplierMixin",
     "MagmaStriderMovementMixin",
     "EliteShieldDamageMixin",
+    "EliteNoHealMixin",
+    "EliteNoRegenMixin",
     "EliteAttackDebuffMixin",
     "EliteMobDropMixin",
     "OriginalWeaponEffectMixin",
@@ -50,7 +52,9 @@
     "SignItemPlaceMixin",
     "VillagerDiscountMixin",
     "InfiniteBucketUseMixin",
-    "InfiniteBucketPlayerMixin"
+    "InfiniteBucketPlayerMixin",
+    "InteractionManagerAccessor",
+    "SweepRangeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

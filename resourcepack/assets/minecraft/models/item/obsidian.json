@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/obsidian",
+  "overrides": [
+    {"predicate": {"custom_model_data": 200013}, "model": "tomkestookit:item/trinket/void_pearl"}
+  ]
+}

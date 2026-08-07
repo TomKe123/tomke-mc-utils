@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 public final class TrinketEffectHandler {
 
-    private static final int REFRESH_INTERVAL = 20; // 1 秒
+    private static final int REFRESH_INTERVAL = 10; // 0.5 秒
 
     private TrinketEffectHandler() {}
 
@@ -34,7 +34,12 @@ public final class TrinketEffectHandler {
             if (!TomkesTookitConfig.enabled("item.trinket")) return true;
             if (!(entity instanceof ServerPlayerEntity player)) return true;
             if (!isFallDamage(source)) return true;
-            return !hasTrinket(player, "cats_eye");
+            if (!hasTrinket(player, "cats_eye")) return true;
+            // 只在摔落会造成致死伤害（或高伤害）时播放图腾特效——避免下坡跳个 2 格就叮咚一下
+            if (amount >= player.getHealth() || amount >= 8.0f) {
+                TotemFxHelper.playTotem(player);
+            }
+            return false;
         });
 
         // 图腾碎片：拦截致死伤害
@@ -67,8 +72,8 @@ public final class TrinketEffectHandler {
             // 一次性读缓存 + 算出拥有的 trinket id set
             Set<String> owned = ownedTrinketsCached(player);
 
-            // 每 tick 效果
-            if (owned.contains("lodestar_pin")) {
+            // 每 tick 效果 + 快速刷新
+            if (owned.contains("lodestar_pin") || owned.contains("gravity_well") || owned.contains("astral_hub")) {
                 TrinketRegistry.TrinketDef def = TrinketRegistry.byId("lodestar_pin");
                 if (def != null) def.applier().accept(player);
             }
@@ -99,24 +104,26 @@ public final class TrinketEffectHandler {
         }
     }
 
-    /** 检查玩家饰品袋里是否有指定 trinket（仅计已解锁格）。*/
+    /** 检查玩家饰品袋里是否有指定 trinket 且未被禁用（仅计已解锁格）。*/
     public static boolean hasTrinket(ServerPlayerEntity player, String trinketId) {
         UUID uuid = player.getUuid();
         int capacity = TrinketStore.getCapacity(uuid);
         ItemStack[] bag = TrinketStore.read(uuid); // 缓存命中 = O(1)
         for (int i = 0; i < capacity && i < bag.length; i++) {
-            if (trinketId.equals(TrinketRegistry.getId(bag[i]))) return true;
+            if (trinketId.equals(TrinketRegistry.getId(bag[i]))
+                && !TrinketRegistry.isDisabled(bag[i])) return true;
         }
         return false;
     }
 
-    /** 读缓存并返回玩家已解锁格中的 trinket id 集合。*/
+    /** 读缓存并返回玩家已解锁格中的 trinket id 集合（跳过被禁用的）。*/
     private static Set<String> ownedTrinketsCached(ServerPlayerEntity player) {
         Set<String> set = new HashSet<>();
         UUID uuid = player.getUuid();
         int capacity = TrinketStore.getCapacity(uuid);
         ItemStack[] bag = TrinketStore.read(uuid);
         for (int i = 0; i < capacity && i < bag.length; i++) {
+            if (TrinketRegistry.isDisabled(bag[i])) continue;
             String id = TrinketRegistry.getId(bag[i]);
             if (id != null) set.add(id);
         }

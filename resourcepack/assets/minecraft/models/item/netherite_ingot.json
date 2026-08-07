@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/netherite_ingot"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100007}, "model": "tomkestookit:item/reforge/titan_plate"},
+    {"predicate": {"custom_model_data": 200025}, "model": "tomkestookit:item/trinket/warlord_crown"},
+    {"predicate": {"custom_model_data": 200035}, "model": "tomkestookit:item/trinket/xp_crown"}
+  ]
+}

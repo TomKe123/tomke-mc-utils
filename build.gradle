@@ -26,3 +26,24 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+/**
+ * 自动打包资源包：把 resourcepack/ 目录压缩成 resourcepack.zip 放到 resources。
+ *
+ * 关键：使用 Gradle 的 Zip task（内部走 java.util.zip，路径分隔符固定为 "/"），
+ * 不用 PowerShell Compress-Archive（Windows 上会写成 "\"，Minecraft 加载不到）。
+ * 必须在 processResources 之前执行，才能把最新 zip 打进 jar。
+ */
+tasks.register('bundleResourcePack', Zip) {
+    description = 'Bundle resourcepack/ dir into src/main/resources/assets/tomkestookit/resourcepack.zip'
+    group = 'build'
+
+    from "${projectDir}/resourcepack"
+    include '**/*'
+    archiveFileName = 'resourcepack.zip'
+    destinationDirectory = file("${projectDir}/src/main/resources/assets/tomkestookit")
+    // 保证同一份 pack.mcmeta 只有一份（Duplicate = EXCLUDE 让第一份获胜）
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+processResources.dependsOn 'bundleResourcePack'
+

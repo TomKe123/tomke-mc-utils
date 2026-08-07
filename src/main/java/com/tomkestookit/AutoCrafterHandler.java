@@ -106,6 +106,9 @@ public final class AutoCrafterHandler {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.EPIC,
+            "3×3 合成 §8· §7铁锭 + 红石 + 工作台");
         return stack;
     }
 

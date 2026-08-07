@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/prismarine_crystals"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100020}, "model": "tomkestookit:item/reforge/abyssal_might"},
+    {"predicate": {"custom_model_data": 200037}, "model": "tomkestookit:item/trinket/abyssal_necklace"},
+    {"predicate": {"custom_model_data": 400002}, "model": "tomkestookit:item/material/abyssal_shard"}
+  ]
+}

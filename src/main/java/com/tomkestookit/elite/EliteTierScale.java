@@ -10,14 +10,16 @@ public final class EliteTierScale {
                            double speedMult, double followRangeMult,
                            double spawnChance, double debuffChance, int debuffDurationTicks) {}
 
+    // spawnChance 现在真的作为"每只 mob 首次评估时是否精英化"的概率使用（EliteMobHandler 消费）
+    // armorMult 现在直接作为附加护甲值（每点约 4% 减伤），不再乘 4
     private static final TierData[] TIERS = {
         null, // index 0 unused
-        new TierData(2.0, 1.5, 1.2, 1.1, 1.5, 0.03, 0.15, 60),   // T1
-        new TierData(3.5, 2.0, 1.5, 1.15, 2.0, 0.08, 0.25, 80),  // T2
-        new TierData(5.0, 3.0, 2.0, 1.2, 3.0, 0.15, 0.35, 100),  // T3
-        new TierData(8.0, 4.0, 3.0, 1.25, 4.0, 0.20, 0.50, 120), // T4
-        new TierData(12.0, 5.0, 4.0, 1.3, 5.0, 0.25, 0.65, 160), // T5
-        new TierData(20.0, 5.0, 5.0, 1.0, 60.0, 1.0, 1.0, 200),  // T-boss (index 6)
+        new TierData(1.5, 1.2, 2.0, 1.05, 1.5, 0.35, 0.10, 60),   // T1  ≈ 1.62× 有效血量
+        new TierData(2.0, 1.4, 3.0, 1.08, 2.0, 0.25, 0.15, 80),   // T2  ≈ 2.36×
+        new TierData(2.8, 1.7, 5.0, 1.10, 3.0, 0.15, 0.25, 100),  // T3  ≈ 3.85×
+        new TierData(3.8, 2.0, 7.0, 1.13, 4.0, 0.08, 0.35, 120),  // T4  ≈ 5.85×
+        new TierData(5.0, 2.4, 10.0, 1.15, 5.0, 0.04, 0.45, 160), // T5  ≈ 9.2×
+        new TierData(15.0, 4.0, 15.0, 1.0, 60.0, 1.0, 1.0, 200),  // Boss (index 6)
     };
 
     /** 威胁评分阈值：rating >= threshold[i] → tier = i+1 */

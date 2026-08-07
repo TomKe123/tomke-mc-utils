@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/nether_star"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100002}, "model": "tomkestookit:item/reforge/berserker_core"},
+    {"predicate": {"custom_model_data": 100019}, "model": "tomkestookit:item/reforge/cosmic_essence"},
+    {"predicate": {"custom_model_data": 200031}, "model": "tomkestookit:item/trinket/astral_hub"}
+  ]
+}

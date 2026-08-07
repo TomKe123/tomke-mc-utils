@@ -69,6 +69,9 @@ public final class RegionFillerRecipe {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.RARE,
+            "3×3 合成 §8· §79 " + type.zh + "桶（一次性）");
         return stack;
     }
 }

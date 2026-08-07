@@ -1,6 +1,7 @@
 package com.tomkestookit.trinket;
 
 import com.tomkestookit.TomkesTookitMod;
+import com.tomkestookit.materials.CustomModelDataRegistry;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
@@ -25,6 +26,8 @@ import java.util.function.Consumer;
 public final class TrinketRegistry {
 
     public static final String NBT_KEY = "TomkesTookitTrinket";
+    /** NBT 布尔：为 true 时该饰品被玩家手动禁用，applier 不触发。*/
+    public static final String NBT_DISABLED = "TomkesTookitTrinketDisabled";
 
     public record TrinketDef(
         String id, String name, Item icon, Item center, Item surround,
@@ -342,9 +345,12 @@ public final class TrinketRegistry {
         ItemStack stack = new ItemStack(def.icon);
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putString(NBT_KEY, def.id);
+        // CustomModelData 用于资源包贴图识别
+        int cmd = CustomModelDataRegistry.forTrinket(def.id);
+        if (cmd != 0) nbt.putInt("CustomModelData", cmd);
         stack.setCustomName(Text.literal("§d§l" + def.name).styled(s -> s.withItalic(false)));
 
-        // 附魔光效（假附魔 + 隐藏 tooltip）
+        // 附魔光效（假附魔 + 隐藏 tooltip），饰品颜色主题从 §d（粉）换成 §b（青）
         NbtList enchList = new NbtList();
         NbtCompound fakeEnch = new NbtCompound();
         fakeEnch.putString("id",
@@ -365,7 +371,43 @@ public final class TrinketRegistry {
             Text.literal("§5饰品 §8- 放入饰品袋生效").styled(s -> s.withItalic(false)))));
         display.put("Lore", lore);
         nbt.put("display", display);
+
+        // 追加品质 + 获取途径
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            trinketQuality(def),
+            trinketSource(def));
         return stack;
+    }
+
+    /** 根据 trinket 类型推断品质：大师>进阶>基础。*/
+    private static com.tomkestookit.materials.ItemQualityTag.Quality trinketQuality(TrinketDef def) {
+        String id = def.id;
+        // 大师系列（进阶链末端）→ 传奇
+        if ("time_dilation_clock".equals(id) || "warlord_crown".equals(id)
+            || "abyssal_heart".equals(id) || "last_stand_bulwark".equals(id)
+            || "astral_hub".equals(id) || "haste_charm_3".equals(id)
+            || "xp_crown".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.LEGENDARY;
+        // 进阶（有前置饰品）→ 史诗
+        if (def.prereqTrinketId != null)
+            return com.tomkestookit.materials.ItemQualityTag.Quality.EPIC;
+        // 图腾碎片、虚空珍珠、末影锚等保命/特殊 → 稀有
+        if ("totem_splinter".equals(id) || "void_pearl".equals(id)
+            || "ender_anchor".equals(id) || "xp_scroll".equals(id)
+            || "magma_strider".equals(id) || "aqua_lung".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.RARE;
+        // 基础饰品 → 优良
+        return com.tomkestookit.materials.ItemQualityTag.Quality.UNCOMMON;
+    }
+
+    /** 获取途径描述。*/
+    private static String trinketSource(TrinketDef def) {
+        if (def.prereqTrinketId != null) {
+            TrinketDef prereq = byId(def.prereqTrinketId);
+            String prereqName = prereq != null ? prereq.name : def.prereqTrinketId;
+            return "3×3 合成 §8· §7中心放 §f" + prereqName + " §7升级而得";
+        }
+        return "3×3 合成 §8· §7放入饰品袋生效";
     }
 
     /** 从 ItemStack 读取 trinket id，非饰品返回 null。*/
@@ -374,6 +416,54 @@ public final class TrinketRegistry {
         NbtCompound nbt = stack.getNbt();
         if (nbt == null || !nbt.contains(NBT_KEY)) return null;
         return nbt.getString(NBT_KEY);
+    }
+
+    /** 该饰品是否被玩家禁用（TrinketBag 菜单里右键切换）。*/
+    public static boolean isDisabled(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        NbtCompound nbt = stack.getNbt();
+        return nbt != null && nbt.getBoolean(NBT_DISABLED);
+    }
+
+    /**
+     * 切换饰品启用/禁用状态。同时刷新 lore 与显示名（前缀带 §7[已禁用]）。
+     * @return 切换后是否为"禁用"状态
+     */
+    public static boolean toggleDisabled(ItemStack stack) {
+        if (stack.isEmpty() || getId(stack) == null) return false;
+        NbtCompound nbt = stack.getOrCreateNbt();
+        boolean newState = !nbt.getBoolean(NBT_DISABLED);
+        nbt.putBoolean(NBT_DISABLED, newState);
+        refreshDisplay(stack);
+        return newState;
+    }
+
+    /** 根据禁用状态重建显示名与 lore（配 buildStack 保持一致）。*/
+    private static void refreshDisplay(ItemStack stack) {
+        String id = getId(stack);
+        TrinketDef def = byId(id);
+        if (def == null) return;
+        boolean disabled = isDisabled(stack);
+        NbtCompound nbt = stack.getOrCreateNbt();
+
+        String nameStr = disabled
+            ? "§7§m" + def.name + "§r §8[已禁用]"
+            : "§d§l" + def.name;
+        stack.setCustomName(Text.literal(nameStr).styled(s -> s.withItalic(false)));
+
+        NbtCompound display = nbt.getCompound("display");
+        NbtList lore = new NbtList();
+        for (String line : def.lore) {
+            lore.add(NbtString.of(Text.Serializer.toJson(
+                Text.literal(line).styled(s -> s.withItalic(false)))));
+        }
+        lore.add(NbtString.of(Text.Serializer.toJson(
+            Text.literal("§5饰品 §8- 放入饰品袋生效").styled(s -> s.withItalic(false)))));
+        lore.add(NbtString.of(Text.Serializer.toJson(
+            Text.literal(disabled ? "§c§l✘ 已禁用 §8- 菜单内右键启用" : "§a§l✓ 已启用 §8- 菜单内右键禁用")
+                .styled(s -> s.withItalic(false)))));
+        display.put("Lore", lore);
+        nbt.put("display", display);
     }
 
     /** 匹配 3x3 输入是否为某个饰品配方。命中返回 def，否则 null。*/
@@ -417,13 +507,14 @@ public final class TrinketRegistry {
         ALL.add(new TrinketDef(id, name, surround, null, surround, lore, applier, prereqId));
     }
 
+    /** 常规饰品 buff：5 秒（100 tick）。刷新间隔 1 秒，足够避免中断。*/
     private static void eff(ServerPlayerEntity p, net.minecraft.entity.effect.StatusEffect effect, int amp) {
-        p.addStatusEffect(new StatusEffectInstance(effect, 40, amp, true, false, false));
+        p.addStatusEffect(new StatusEffectInstance(effect, 100, amp, true, false, false));
     }
 
-    /** 长时长版本：给夜视等对"即将结束闪烁"敏感的效果用。5 秒，避免频闪。*/
+    /** 夜视专用长时长版本：60 秒（1200 tick），彻底避免结束前的闪烁。*/
     private static void effLong(ServerPlayerEntity p, net.minecraft.entity.effect.StatusEffect effect, int amp) {
-        p.addStatusEffect(new StatusEffectInstance(effect, 100, amp, true, false, false));
+        p.addStatusEffect(new StatusEffectInstance(effect, 1200, amp, true, false, false));
     }
 
     // ---- special appliers ----
@@ -445,6 +536,9 @@ public final class TrinketRegistry {
         if (last != null && now - last < cooldown) return;
         TURTLE_COOLDOWN.put(p.getUuid(), now);
 
+        // 保命效果触发 → 不死图腾特效
+        TotemFxHelper.playTotem(p);
+
         if (hasLastStand) {
             p.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 120, 2, true, true, true));
             p.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 120, 3, true, true, true));
@@ -457,12 +551,12 @@ public final class TrinketRegistry {
         }
     }
 
-    /** 快速检查背包中是否存在某 trinket。*/
+    /** 快速检查背包中是否存在某 trinket 且未被禁用。*/
     public static boolean hasTrinketInBag(ServerPlayerEntity p, String trinketId) {
         ItemStack[] bag = com.tomkestookit.trinket.TrinketStore.read(p.getUuid());
         int capacity = com.tomkestookit.trinket.TrinketStore.getCapacity(p.getUuid());
         for (int i = 0; i < capacity && i < bag.length; i++) {
-            if (trinketId.equals(getId(bag[i]))) return true;
+            if (trinketId.equals(getId(bag[i])) && !isDisabled(bag[i])) return true;
         }
         return false;
     }
@@ -551,6 +645,8 @@ public final class TrinketRegistry {
             p.getYaw(), p.getPitch());
         p.setVelocity(0, 0, 0);
         p.networkHandler.sendPacket(new net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket(p));
+        // 从虚空抢救回来 → 不死图腾特效
+        TotemFxHelper.playTotem(p);
         p.sendMessage(Text.literal("§5[虚空珍珠] 把你拽了回来。").styled(s -> s.withItalic(false)),
             true);
     }
@@ -568,6 +664,9 @@ public final class TrinketRegistry {
         long now = System.currentTimeMillis();
         if (last != null && now - last < cooldown) return false;
         TOTEM_COOLDOWN.put(p.getUuid(), now);
+
+        // 抵挡致死伤害 → 不死图腾特效
+        TotemFxHelper.playTotem(p);
 
         if (hasTotemHeart) {
             p.setHealth(p.getMaxHealth() * 0.5f);

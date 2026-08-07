@@ -117,8 +117,9 @@ public final class TrinketBagMenu {
                 "§7已解锁 §f" + capacity + "§7/§f" + TrinketStore.MAX_SIZE + " §7格",
                 "§e第 " + (page + 1) + "/" + TrinketStore.PAGE_COUNT + " 页")));
         inv.setStack(HELP_SLOT, MenuButtons.button(Items.BOOK, "§e§l说明",
-            List.of("§7左键点击已解锁格放入/取出饰品",
-                "§7只有饰品物品可以放入",
+            List.of("§7左键 §f放入/取出饰品",
+                "§7右键 §f切换 §a启用§7/§c禁用",
+                "§8禁用状态不消耗、不生效",
                 isSelf ? "§7点击左下 §a[解锁] §7扩容" : "§8他人饰品袋不可扩容",
                 "§7Shift+F 查看特殊配方")));
 
@@ -451,8 +452,29 @@ public final class TrinketBagMenu {
                 return;
             }
 
-            // --- 已解锁饰品格：手动实现放入/取出 ---
+            // --- 已解锁饰品格：右键切换禁用状态；左键放入/取出 ---
+            if (button == 1 && actionType == SlotActionType.PICKUP && getCursorStack().isEmpty()) {
+                handleToggleDisable(sp, slotIndex);
+                return;
+            }
             handleTrinketSlotClick(sp, slotIndex);
+        }
+
+        /** 右键点击已装备的饰品格：切换启用/禁用状态。*/
+        private void handleToggleDisable(ServerPlayerEntity sp, int slotIndex) {
+            ItemStack inSlot = bagInventory.getStack(slotIndex);
+            if (inSlot.isEmpty() || com.tomkestookit.trinket.TrinketRegistry.getId(inSlot) == null) {
+                return; // 空格 / 占位符 / 非饰品：忽略
+            }
+            boolean nowDisabled = com.tomkestookit.trinket.TrinketRegistry.toggleDisabled(inSlot);
+            bagInventory.setStack(slotIndex, inSlot);
+            saveCurrentPage(); // 立即持久化并使缓存失效
+            sp.playSound(nowDisabled ? SoundEvents.UI_BUTTON_CLICK.value() : SoundEvents.BLOCK_CHAIN_PLACE,
+                SoundCategory.MASTER, 0.5f, nowDisabled ? 0.7f : 1.4f);
+            sp.sendMessage(Text.literal(nowDisabled
+                ? "§7[饰品] 已禁用 §f" + inSlot.getName().getString()
+                : "§a[饰品] 已启用 §f" + inSlot.getName().getString()), true);
+            sendContentUpdates();
         }
 
         /** 翻页：先保存当前页，再打开新页。*/

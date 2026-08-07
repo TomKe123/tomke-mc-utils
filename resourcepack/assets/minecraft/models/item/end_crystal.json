@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/end_crystal"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100011}, "model": "tomkestookit:item/reforge/skyforge_rune"},
+    {"predicate": {"custom_model_data": 100023}, "model": "tomkestookit:item/reforge/void_pierce"},
+    {"predicate": {"custom_model_data": 400006}, "model": "tomkestookit:item/material/void_core"}
+  ]
+}

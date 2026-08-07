@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/scute"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 200004}, "model": "tomkestookit:item/trinket/turtle_ward"}
+  ]
+}

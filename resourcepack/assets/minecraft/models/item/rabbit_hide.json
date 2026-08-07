@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/rabbit_hide"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 200005}, "model": "tomkestookit:item/trinket/cats_eye"}
+  ]
+}

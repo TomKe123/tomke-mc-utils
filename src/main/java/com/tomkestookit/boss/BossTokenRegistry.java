@@ -1,5 +1,6 @@
 package com.tomkestookit.boss;
 
+import com.tomkestookit.materials.CustomModelDataRegistry;
 import com.tomkestookit.materials.MobMaterialRegistry;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.boss.BossBar;
@@ -96,6 +97,9 @@ public final class BossTokenRegistry {
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putString("TomkesTookitBossToken", def.bossId());
 
+        int cmd = CustomModelDataRegistry.forBoss(def.bossId());
+        if (cmd != 0) nbt.putInt("CustomModelData", cmd);
+
         NbtCompound display = nbt.getCompound("display");
         NbtList lore = new NbtList();
         List<String> lines = List.of(
@@ -119,6 +123,11 @@ public final class BossTokenRegistry {
         ench.add(new NbtCompound());
         nbt.put("Enchantments", ench);
         nbt.putInt("HideFlags", 1);
+
+        // Boss 令牌统一为传奇品质
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.LEGENDARY,
+            "3×3 合成 §8· §7需精英怪掉落的怪物素材");
 
         return stack;
     }

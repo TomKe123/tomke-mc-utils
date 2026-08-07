@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "minecraft:item/netherite_sword"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100026}, "model": "tomkestookit:item/reforge/sweep_grand"},
+    {"predicate": {"custom_model_data": 300002}, "model": "tomkestookit:item/weapon/soul_reaper"},
+    {"predicate": {"custom_model_data": 300004}, "model": "tomkestookit:item/weapon/void_blade"}
+  ]
+}

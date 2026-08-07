@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/warped_stem",
+  "overrides": [
+    {"predicate": {"custom_model_data": 100015}, "model": "tomkestookit:item/reforge/wardwood_bark"}
+  ]
+}

@@ -37,9 +37,16 @@ public final class EliteMobHandler {
     private static final UUID BASE_MOD_UUID = UUID.fromString("70b0a5d0-1e2f-4a3b-8c4d-5e6f7a8b9c0d");
     private static final String MOD_NAME_PREFIX = "tomkestookit_elite_";
     private static final int TICK_INTERVAL = 20; // 每秒一次
+    /** 32 格半径内允许同时存在的精英怪上限。*/
+    private static final int MAX_ELITES_PER_PLAYER = 6;
+    /** 64 格半径内允许同时存在的精英怪上限（全局上限，防刷怪塔堆精英）。*/
+    private static final int MAX_ELITES_WORLD = 20;
 
     /** 保存精英化前的原始 customName（可能是 null），用于退化时还原。*/
     private static final Map<UUID, Text> ORIGINAL_NAMES = new HashMap<>();
+
+    /** 已评估过精英化骰点的 mob（无论是否变精英），避免每秒重新骰点导致积累精英。*/
+    private static final Set<UUID> PROCESSED = new HashSet<>();
 
     private EliteMobHandler() {}
 
@@ -72,6 +79,7 @@ public final class EliteMobHandler {
             if (mob == null || !mob.isAlive()) {
                 EliteMobRegistry.remove(uuid);
                 ORIGINAL_NAMES.remove(uuid);
+                PROCESSED.remove(uuid);
                 continue;
             }
             // Boss 不退化（Boss 有独立管理器 BossBarManager 负责生命周期）
@@ -97,21 +105,60 @@ public final class EliteMobHandler {
                 if (playerTier <= 0) continue;
 
                 Box box = new Box(player.getBlockPos()).expand(32);
+
+                // 32 格内上限
+                long nearbyElites = world.getEntitiesByClass(MobEntity.class, box,
+                    m -> m.isAlive() && EliteMobRegistry.isElite(m)).size();
+                if (nearbyElites >= MAX_ELITES_PER_PLAYER) continue;
+
+                // 世界全局 64 格内上限——防刷怪塔无限堆精英
+                // 精英之间至少间隔 25 格
+                Box worldBox = new Box(player.getBlockPos()).expand(64);
+                List<MobEntity> allElites = world.getEntitiesByClass(MobEntity.class, worldBox,
+                    m -> m.isAlive() && EliteMobRegistry.isElite(m));
+                if (allElites.size() >= MAX_ELITES_WORLD) continue;
+
+                // 精英间最小间距 16 格
+                Box sparseBox = new Box(player.getBlockPos()).expand(16);
+                boolean tooClose = false;
+                for (MobEntity elite : allElites) {
+                    if (sparseBox.contains(elite.getPos())) { tooClose = true; break; }
+                }
+                if (tooClose) continue;
+
                 List<MobEntity> mobs = world.getEntitiesByClass(MobEntity.class, box, m ->
                     m.isAlive()
                     && !m.isPersistent()
                     && m.getType().getSpawnGroup() == SpawnGroup.MONSTER
                     && !EliteMobRegistry.isElite(m)
+                    && !PROCESSED.contains(m.getUuid())
                     && m.getTarget() == player
                 );
                 for (MobEntity mob : mobs) {
+                    // 每只怪只评估一次（无论是否精英化）
+                    PROCESSED.add(mob.getUuid());
+                    if (nearbyElites >= MAX_ELITES_PER_PLAYER) break;
+
                     // 随机在 [tier-1, tier+1] 挑选 elite tier
                     int minT = Math.max(1, playerTier - 1);
                     int maxT = Math.min(5, playerTier + 1);
                     int chosen = minT + world.random.nextInt(maxT - minT + 1);
+
+                    // 按该 tier 的 spawnChance 决定是否精英化
+                    // 战斗狂热倍率：玩家 1 分钟内击杀 10 只 + 移动 30 格后 3× 概率
+                    double chance = EliteTierScale.get(chosen).spawnChance()
+                        * CombatFrenzyTracker.getSpawnMult(player);
+                    if (world.random.nextDouble() >= chance) continue;
+
                     applyElite(mob, chosen);
+                    nearbyElites++;
                 }
             }
+        }
+
+        // 定期清理 PROCESSED 集合，防止内存膨胀（每 30 秒）
+        if (server.getTicks() % 600 == 0) {
+            PROCESSED.removeIf(uuid -> resolveMob(server, uuid) == null);
         }
     }
 
@@ -139,12 +186,15 @@ public final class EliteMobHandler {
             modUuid(0, tier), data.healthMult() - 1.0, EntityAttributeModifier.Operation.MULTIPLY_BASE);
         applyModifier(mob, EntityAttributes.GENERIC_ATTACK_DAMAGE,
             modUuid(1, tier), data.damageMult() - 1.0, EntityAttributeModifier.Operation.MULTIPLY_BASE);
+        // armorMult 现在就是附加护甲值本身（T1=2, T5=10, Boss=15），不再 ×4
         applyModifier(mob, EntityAttributes.GENERIC_ARMOR,
-            modUuid(2, tier), data.armorMult() * 4.0, EntityAttributeModifier.Operation.ADDITION);
+            modUuid(2, tier), data.armorMult(), EntityAttributeModifier.Operation.ADDITION);
         applyModifier(mob, EntityAttributes.GENERIC_MOVEMENT_SPEED,
             modUuid(3, tier), data.speedMult() - 1.0, EntityAttributeModifier.Operation.MULTIPLY_BASE);
         applyModifier(mob, EntityAttributes.GENERIC_FOLLOW_RANGE,
             modUuid(4, tier), data.followRangeMult(), EntityAttributeModifier.Operation.ADDITION);
+        // 精英怪不允许自动消失
+        mob.setPersistent();
 
         EntityAttributeInstance healthAttr = mob.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH);
         if (healthAttr != null) {
@@ -156,21 +206,19 @@ public final class EliteMobHandler {
             ORIGINAL_NAMES.put(mob.getUuid(), mob.getCustomName());
         }
 
-        String mobName = mob.getName().getString();
-        // 如果之前已被精英化过，getName 会带前缀 → 用 default name 更保险
+        // 名字：短，颜色代表 tier。示例："§e★ 僵尸" / "§6★★ 僵尸" / "§c★★★ 僵尸"
         Text origName = ORIGINAL_NAMES.get(mob.getUuid());
-        if (origName == null) {
-            mobName = mob.getType().getName().getString();
-        }
-        String displayName;
-        if (tier <= 2) {
-            displayName = "§d§l⚔ 精英" + mobName + " [T" + tier + "]";
-        } else if (tier <= 4) {
-            displayName = "§6§l⚔ 精英" + mobName + " [T" + tier + "]";
-        } else {
-            displayName = "§6§l§k|§r§6§l⚔ 精英" + mobName + " [T" + tier + "]§6§l§k|";
-        }
-        mob.setCustomName(Text.literal(displayName));
+        String mobName = origName != null ? origName.getString() : mob.getType().getName().getString();
+        String color = switch (tier) {
+            case 1 -> "§a";  // 绿
+            case 2 -> "§e";  // 黄
+            case 3 -> "§6";  // 金
+            case 4 -> "§c";  // 红
+            case 5 -> "§5";  // 紫
+            default -> "§4"; // Boss
+        };
+        String stars = "★".repeat(Math.min(tier, 5));
+        mob.setCustomName(Text.literal(color + stars + " " + mobName));
         mob.setCustomNameVisible(true);
 
         NbtCompound eliteTag = new NbtCompound();

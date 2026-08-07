@@ -71,6 +71,10 @@ public final class GreedPotion {
 
         // 客户端 tooltip 上色：让药水显示为绿宝石绿
         nbt.putInt("CustomPotionColor", 0x1CDC4A);
+
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            com.tomkestookit.materials.ItemQualityTag.Quality.RARE,
+            "3×3 合成 §8· §78 绿宝石块 + 玻璃瓶");
         return stack;
     }
 }

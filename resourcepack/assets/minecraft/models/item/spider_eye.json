@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/spider_eye"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100027}, "model": "tomkestookit:item/reforge/target_rush"}
+  ]
+}

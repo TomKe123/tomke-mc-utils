@@ -1,6 +1,7 @@
 package com.tomkestookit.reforge;
 
 import com.tomkestookit.AntigravBootsHandler;
+import com.tomkestookit.materials.CustomModelDataRegistry;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.item.*;
@@ -41,11 +42,11 @@ public final class ReforgeRegistry {
     static {
         // ---- 武器系 ----
         // 中心 blaze_powder（图标），围 8 blaze_rod → "怒火"
-        reg("fury_shard", "怒火碎片", Items.BLAZE_POWDER,
+        reg("fury_shard", "§c怒火碎片", Items.BLAZE_POWDER,
             "generic.attack_damage", 2.0, 0, "mainhand",
             "b1a00001-0000-0000-0000-000000000001", 8,
             ReforgeRegistry::isWeapon,
-            List.of("§8「把烈焰人的怒气磨成粉，塞进刀刃。」", "§7+2 攻击伤害",
+            List.of("§8§o把烈焰人的怒气磨成粉，塞进刀刃。", "§7+2 攻击伤害",
                 "§7适用于：§f剑 / 斧 / 三叉戟"),
             Items.BLAZE_POWDER, Items.BLAZE_ROD);
 
@@ -305,6 +306,53 @@ public final class ReforgeRegistry {
                 "§e稀有 §8- 星尘凝聚",
                 "§7适用于：§f头盔 / 胸甲 / 护腿 / 靴子"),
             Items.GLOWSTONE_DUST, Items.NETHERITE_SCRAP);
+
+        // ====================================================================
+        //  横扫范围扩大系列（改横扫之刃的 3 格范围）
+        //  在 SweepRangeMixin 里读 APPLIED_TAG 决定 tier
+        //  amount=0 因为不加任何 vanilla attribute，只是标记位
+        // ====================================================================
+
+        // 横扫扩幅 —— 3×3
+        reg("sweep_widener", "横扫扩幅", Items.IRON_SWORD,
+            "generic.luck", 0.0, 0, "mainhand",
+            "b1a00001-0000-0000-0000-000000000030", 20,
+            ReforgeRegistry::isWeapon,
+            List.of("§8「一剑挥出去，扫过一片。」",
+                "§7横扫范围扩大到 §f3×3",
+                "§7需要武器附带附魔 §f横扫之刃",
+                "§e稀有 §8- 独立不成链",
+                "§7适用于：§f剑 / 斧"),
+            Items.IRON_SWORD, Items.IRON_BLOCK);
+
+        // 横扫巨阵 —— 5×5
+        reg("sweep_grand", "横扫巨阵", Items.NETHERITE_SWORD,
+            "generic.luck", 0.0, 0, "mainhand",
+            "b1a00001-0000-0000-0000-000000000031", 45,
+            ReforgeRegistry::isWeapon,
+            List.of("§8「与其挥剑，不如挥手。」",
+                "§7横扫范围扩大到 §f5×5",
+                "§7需要武器附带附魔 §f横扫之刃",
+                "§5史诗 §8- 覆盖横扫扩幅",
+                "§7适用于：§f剑 / 斧"),
+            Items.NETHERITE_SWORD, Items.NETHERITE_BLOCK);
+
+        // ====================================================================
+        //  索敌突进重铸
+        // ====================================================================
+
+        // 索敌：自动突进到最近目标并造成一次攻击
+        reg("target_rush", "掠食本能", Items.SPIDER_EYE,
+            "generic.luck", 0.0, 0, "mainhand",
+            "b1a00001-0000-0000-0000-000000000032", 30,
+            ReforgeRegistry::isWeapon,
+            List.of("§8「猎物呼吸的频率你早已记住。」",
+                "§7挥刀时自动突进到 §f5 格内 §7最近的敌人",
+                "§7并造成一次攻击",
+                "§8不可穿墙 · 需要视线 · 无冷却",
+                "§c稀有 §8- 近战专属",
+                "§7适用于：§f剑 / 斧 / 三叉戟"),
+            Items.SPIDER_EYE, Items.ENDER_PEARL);
     }
 
     public static List<ReforgeDef> all() { return Collections.unmodifiableList(ALL); }
@@ -319,6 +367,9 @@ public final class ReforgeRegistry {
         ItemStack stack = new ItemStack(def.icon);
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putString(NBT_KEY, def.id);
+        // CustomModelData 用于资源包贴图识别
+        int cmd = CustomModelDataRegistry.forReforge(def.id);
+        if (cmd != 0) nbt.putInt("CustomModelData", cmd);
         stack.setCustomName(Text.literal("§6§l" + def.name + " §7[重铸石]").styled(s -> s.withItalic(false)));
         NbtCompound display = nbt.getCompound("display");
         NbtList lore = new NbtList();
@@ -332,7 +383,48 @@ public final class ReforgeRegistry {
             Text.literal("§8铁砧费用 " + def.anvilCost + " 级").styled(s -> s.withItalic(false)))));
         display.put("Lore", lore);
         nbt.put("display", display);
+
+        // 追加品质 + 获取途径
+        com.tomkestookit.materials.ItemQualityTag.append(stack,
+            reforgeQuality(def.id),
+            reforgeSource(def.id));
         return stack;
+    }
+
+    /** 根据 reforge id 推断品质。*/
+    private static com.tomkestookit.materials.ItemQualityTag.Quality reforgeQuality(String id) {
+        // 传奇：宇宙精华、虚空穿透、横扫巨阵
+        if ("cosmic_essence".equals(id) || "void_pierce".equals(id) || "sweep_grand".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.LEGENDARY;
+        // 史诗：泰坦之心、磐石板甲、经验汲取
+        if ("titan_heart".equals(id) || "bedrock_bulwark".equals(id) || "soul_mend".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.EPIC;
+        // 稀有：狂战之核、泰坦铭板、炎爆晶体、龙鳞铭板、深海之力、血月怒火、魔源树皮、横扫扩幅
+        if ("berserker_core".equals(id) || "titan_plate".equals(id)
+            || "inferno_crystal".equals(id) || "dragon_scale_plate".equals(id)
+            || "abyssal_might".equals(id) || "blood_moon_fury".equals(id)
+            || "wardwood_bark".equals(id) || "stardust_weight".equals(id)
+            || "sweep_widener".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.RARE;
+        // 优良：钻石壳、天锻符文、灵魂锋刃、反重力核心
+        if ("diamond_shell".equals(id) || "skyforge_rune".equals(id)
+            || "soul_edge".equals(id) || "antigrav_boots".equals(id))
+            return com.tomkestookit.materials.ItemQualityTag.Quality.UNCOMMON;
+        // 其他：普通
+        return com.tomkestookit.materials.ItemQualityTag.Quality.COMMON;
+    }
+
+    /** 根据 reforge id 描述获取途径。*/
+    private static String reforgeSource(String id) {
+        // 怪物专属素材系列
+        if (MOB_MATERIAL_REFORGES.contains(id)) {
+            return "3×3 合成 §8· §7需要精英怪掉落素材";
+        }
+        // 传奇重铸石
+        if ("cosmic_essence".equals(id) || "titan_heart".equals(id)
+            || "bedrock_bulwark".equals(id) || "dragon_scale_plate".equals(id))
+            return "3×3 合成 §8· §7需要稀有材料";
+        return "3×3 合成 §8· §7铁砧敲装备生效";
     }
 
     /** 从 ItemStack 读取重铸石 id。非重铸石返回 null。*/
@@ -424,17 +516,59 @@ public final class ReforgeRegistry {
         return null;
     }
 
+    /** 怪物专属素材系列——这些重铸石的合成材料需要 MobMaterial NBT 物品。*/
+    private static final java.util.Set<String> MOB_MATERIAL_REFORGES = java.util.Set.of(
+        "abyssal_might", "soul_edge", "blood_moon_fury", "void_pierce", "stardust_weight"
+    );
+
     private static boolean matches(net.minecraft.inventory.RecipeInputInventory inv, ReforgeDef def) {
         ItemStack center = inv.getStack(4);
-        if (center.isEmpty() || center.getItem() != def.recipeCenter) return false;
+        if (center.isEmpty()) return false;
         // 排除已经是重铸石的（避免用一个重铸石当中心去合另一个）
         if (getId(center) != null) return false;
+
+        boolean requireMobMat = MOB_MATERIAL_REFORGES.contains(def.id);
+
+        // 检查中心
+        if (requireMobMat) {
+            String centerMatId = mobMaterialIdFor(def.recipeCenter);
+            if (centerMatId != null) {
+                if (!com.tomkestookit.materials.MobMaterialRegistry.is(center, centerMatId)) return false;
+            } else {
+                if (center.getItem() != def.recipeCenter) return false;
+            }
+        } else {
+            if (center.getItem() != def.recipeCenter) return false;
+        }
+
+        // 检查外围 8 格
         int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
-        for (int i : surround) {
-            ItemStack s = inv.getStack(i);
-            if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
+        if (requireMobMat) {
+            String surroundMatId = mobMaterialIdFor(def.recipeSurround);
+            for (int i : surround) {
+                ItemStack s = inv.getStack(i);
+                if (surroundMatId != null) {
+                    if (!com.tomkestookit.materials.MobMaterialRegistry.is(s, surroundMatId)) return false;
+                } else {
+                    if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
+                }
+            }
+        } else {
+            for (int i : surround) {
+                ItemStack s = inv.getStack(i);
+                if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
+            }
         }
         return true;
+    }
+
+    /** 判断一个 Item 是否对应某个 MobMaterial 的 icon；是则返回该素材 id。*/
+    private static String mobMaterialIdFor(Item item) {
+        for (com.tomkestookit.materials.MobMaterialRegistry.MaterialDef mat :
+                com.tomkestookit.materials.MobMaterialRegistry.all()) {
+            if (mat.icon() == item) return mat.id();
+        }
+        return null;
     }
 
     public static boolean isWeapon(ItemStack stack) {

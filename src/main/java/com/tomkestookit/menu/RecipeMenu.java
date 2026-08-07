@@ -48,7 +48,9 @@ public final class RecipeMenu {
         STONECUTTING("切石", Items.STONECUTTER),
         SPECIAL("魔改配方", Items.NETHER_STAR),
         TRINKET("饰品", Items.AMETHYST_SHARD),
-        REFORGE("重铸石", Items.ANVIL);
+        REFORGE("重铸石", Items.ANVIL),
+        WEAPON("武器", Items.NETHERITE_SWORD),
+        BOSS("Boss令牌", Items.NETHER_STAR);
 
         final String label;
         final net.minecraft.item.Item icon;
@@ -83,7 +85,8 @@ public final class RecipeMenu {
         }
 
         int totalPages;
-        if (tab == Tab.SPECIAL || tab == Tab.TRINKET || tab == Tab.REFORGE) {
+        if (tab == Tab.SPECIAL || tab == Tab.TRINKET || tab == Tab.REFORGE
+                || tab == Tab.WEAPON || tab == Tab.BOSS) {
             totalPages = renderSpecialTab(viewer, inv, actions, page, tab);
         } else {
             totalPages = renderRecipeTab(viewer, inv, tab, page);
@@ -141,6 +144,8 @@ public final class RecipeMenu {
             case SPECIAL -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.CRAFTING).size();
             case TRINKET -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.TRINKET).size();
             case REFORGE -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.REFORGE).size();
+            case WEAPON  -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.WEAPON).size();
+            case BOSS    -> SpecialRecipeCatalog.byCategory(SpecialRecipeCatalog.Category.BOSS).size();
             default -> collect(server, tab).size();
         };
     }
@@ -170,6 +175,8 @@ public final class RecipeMenu {
         SpecialRecipeCatalog.Category cat = switch (tab) {
             case TRINKET -> SpecialRecipeCatalog.Category.TRINKET;
             case REFORGE -> SpecialRecipeCatalog.Category.REFORGE;
+            case WEAPON  -> SpecialRecipeCatalog.Category.WEAPON;
+            case BOSS    -> SpecialRecipeCatalog.Category.BOSS;
             default -> SpecialRecipeCatalog.Category.CRAFTING;
         };
         List<SpecialRecipeEntry> list = SpecialRecipeCatalog.byCategory(cat);
@@ -247,6 +254,8 @@ public final class RecipeMenu {
         Tab returnTab;
         if (key.startsWith("trinket_")) returnTab = Tab.TRINKET;
         else if (key.startsWith("reforge_")) returnTab = Tab.REFORGE;
+        else if (key.startsWith("weapon_")) returnTab = Tab.WEAPON;
+        else if (key.startsWith("boss_")) returnTab = Tab.BOSS;
         else returnTab = Tab.SPECIAL;
         final Tab returnTabRef = returnTab;
         actions.put(BACK_SLOT, p -> open(p, returnTabRef, 0));

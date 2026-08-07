@@ -107,6 +107,10 @@ public final class OriginalWeaponRegistry {
         NbtCompound nbt = stack.getOrCreateNbt();
         nbt.putString(NBT_KEY, def.id());
 
+        // CustomModelData 用于资源包贴图识别
+        int cmd = CustomModelDataRegistry.forWeapon(def.id());
+        if (cmd != 0) nbt.putInt("CustomModelData", cmd);
+
         // 自定义名称
         stack.setCustomName(Text.literal(def.rarity() + "§l" + def.name())
             .styled(s -> s.withItalic(false)));
@@ -153,6 +157,14 @@ public final class OriginalWeaponRegistry {
         display.put("Lore", lore);
         nbt.put("display", display);
 
+        // 品质：血月镰刀=稀有；灵魂收割者=史诗；深渊三叉戟=稀有；虚空之刃=传奇
+        ItemQualityTag.Quality q = switch (def.id()) {
+            case "void_blade" -> ItemQualityTag.Quality.LEGENDARY;
+            case "soul_reaper" -> ItemQualityTag.Quality.EPIC;
+            default -> ItemQualityTag.Quality.RARE;
+        };
+        ItemQualityTag.append(stack, q, "3×3 合成 §8· §7中心需怪物专属素材");
+
         return stack;
     }
 
@@ -173,11 +185,28 @@ public final class OriginalWeaponRegistry {
 
     private static boolean matches(net.minecraft.inventory.RecipeInputInventory inv, WeaponDef def) {
         ItemStack center = inv.getStack(4);
-        if (center.getItem() != def.centerItem()) return false;
+        // 中心必须是对应的 MobMaterial NBT 物品（不能用普通原版物品代替）
+        String matId = materialIdForCenter(def);
+        if (matId != null) {
+            if (!com.tomkestookit.materials.MobMaterialRegistry.is(center, matId)) return false;
+        } else {
+            if (center.getItem() != def.centerItem()) return false;
+        }
         int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
         for (int i : surround) {
             if (inv.getStack(i).getItem() != def.surroundItem()) return false;
         }
         return true;
+    }
+
+    /** 根据 centerItem 映射到 MobMaterial id（如果有对应关系）。*/
+    private static String materialIdForCenter(WeaponDef def) {
+        Item c = def.centerItem();
+        if (c == Items.REDSTONE) return "blood_moon_essence";
+        if (c == Items.SOUL_SAND) return "soul_crystal";
+        if (c == Items.PRISMARINE_CRYSTALS) return "abyssal_shard";
+        if (c == Items.END_CRYSTAL) return "void_core";
+        if (c == Items.GLOWSTONE_DUST) return "stardust";
+        return null;
     }
 }

@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/glowstone_dust"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 100024}, "model": "tomkestookit:item/reforge/stardust_weight"},
+    {"predicate": {"custom_model_data": 200017}, "model": "tomkestookit:item/trinket/aurora_pendant"},
+    {"predicate": {"custom_model_data": 200023}, "model": "tomkestookit:item/trinket/adrenaline_injector"},
+    {"predicate": {"custom_model_data": 400004}, "model": "tomkestookit:item/material/stardust"}
+  ]
+}

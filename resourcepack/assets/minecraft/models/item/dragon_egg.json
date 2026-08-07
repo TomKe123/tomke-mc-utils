@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:block/dragon_egg"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 500004}, "model": "tomkestookit:item/boss/void_dragon_child"}
+  ]
+}

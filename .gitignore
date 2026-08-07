@@ -32,3 +32,16 @@ desktop.ini
 # Java
 *.class
 hs_err_pid*
+
+# Claude Code
+.claude/
+
+# Generated resource pack zip (built by Gradle bundleResourcePack)
+src/main/resources/assets/tomkestookit/resourcepack.zip
+
+# FurfSky Reborn (texture source, not part of project)
+§aFurf§bSky*/
+
+# Misc
+openspec/
+server.properties.resource-pack.txt

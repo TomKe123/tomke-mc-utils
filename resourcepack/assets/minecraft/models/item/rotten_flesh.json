@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/rotten_flesh"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 400001}, "model": "tomkestookit:item/material/corrupt_sinew"}
+  ]
+}

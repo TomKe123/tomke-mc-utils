@@ -1,0 +1,10 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/redstone"
+  },
+  "overrides": [
+    {"predicate": {"custom_model_data": 200040}, "model": "tomkestookit:item/trinket/blood_moon_amulet"},
+    {"predicate": {"custom_model_data": 400005}, "model": "tomkestookit:item/material/blood_moon_essence"}
+  ]
+}

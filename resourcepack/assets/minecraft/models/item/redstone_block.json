@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/redstone_block",
+  "overrides": [
+    {"predicate": {"custom_model_data": 100022}, "model": "tomkestookit:item/reforge/blood_moon_fury"}
+  ]
+}

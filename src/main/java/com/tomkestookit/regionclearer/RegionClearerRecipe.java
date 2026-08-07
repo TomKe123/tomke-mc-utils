@@ -88,6 +88,15 @@ public final class RegionClearerRecipe {
         }
         display.put("Lore", lore);
         nbt.put("display", display);
+
+        com.tomkestookit.materials.ItemQualityTag.Quality q = switch (tier) {
+            case WOOD, STONE -> com.tomkestookit.materials.ItemQualityTag.Quality.UNCOMMON;
+            case IRON, GOLD -> com.tomkestookit.materials.ItemQualityTag.Quality.RARE;
+            case DIAMOND -> com.tomkestookit.materials.ItemQualityTag.Quality.EPIC;
+            case NETHERITE -> com.tomkestookit.materials.ItemQualityTag.Quality.LEGENDARY;
+        };
+        com.tomkestookit.materials.ItemQualityTag.append(stack, q,
+            "3×3 合成 §8· §7铁镐 + 8 " + tier.zh + "材料");
         return stack;
     }
 }

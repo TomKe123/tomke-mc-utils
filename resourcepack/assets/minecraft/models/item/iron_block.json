@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/iron_block",
+  "overrides": [
+    {"predicate": {"custom_model_data": 100004}, "model": "tomkestookit:item/reforge/iron_bark"},
+    {"predicate": {"custom_model_data": 200030}, "model": "tomkestookit:item/trinket/gravity_well"}
+  ]
+}
