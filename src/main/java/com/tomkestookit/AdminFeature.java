@@ -82,7 +82,7 @@ public final class AdminFeature {
         add("item.entity_capture",       "生物收纳",         Items.EGG,           Group.ITEM, "shift+右键生物装进对应刷怪蛋");
         add("item.trinket",             "饰品系统",         Items.ENDER_EYE,     Group.ITEM, "27 格饰品袋 + 被动效果 + 菜单入口");
         add("item.reforge",             "重铸石系统",       Items.ANVIL,         Group.ITEM, "铁砧 + 重铸石给装备追加属性");
-        add("item.boss_token",          "Boss 召唤令牌",    Items.WITHER_SKELETON_SKULL, Group.ITEM, "手持召唤令牌右键地面 → 3s 吟唱召唤精英 Boss");
+        // item.boss_token Boss 召唤系统已取消
         add("item.original_weapon",     "原创武器",         Items.NETHERITE_SWORD, Group.ITEM, "血月镰刀 / 灵魂收割者 / 深渊三叉戟 / 虚空之刃合成 + 特效");
 
         // ---------- 命令 ----------
@@ -105,7 +105,7 @@ public final class AdminFeature {
         add("world.item_cleanup_timer", "定时清理掉落物",   Items.CLOCK,         Group.WORLD, "每 30 分钟清理当前维度掉落物，提前 1 分钟 bossbar 提醒");
         add("world.item_cleanup_lag",   "卡顿清理掉落物",   Items.HOPPER,        Group.WORLD, "当前维度掉落物过多且 MSPT 偏高时，提前 10 秒 bossbar 提醒后清理");
         add("world.armor_stand_durable","盔甲架耐久增强",   Items.ARMOR_STAND,   Group.WORLD, "盔甲架需要连续攻击 5 次才会破坏，横扫只算 1 次");
-        add("world.elite_mobs",         "精英怪系统",       Items.WITHER_SKELETON_SKULL, Group.WORLD, "野外自然生成的敌对生物按玩家实力概率精英化，掉落饰品/重铸石");
+        // world.elite_mobs 精英怪系统已彻底取消
 
         // ---------- UI ----------
         add("ui.sidebar",                "侧栏 TPS/MSPT",    Items.OAK_SIGN,      Group.UI, "每秒刷新");

@@ -4,7 +4,7 @@
     "layer0": "minecraft:item/compass_16"
   },
   "overrides": [
-    {"predicate": {"angle": 0.000000}, "model": "minecraft:item/compass_00"},
+    {"predicate": {"angle": 0.000000}, "model": "minecraft:item/compass_16"},
     {"predicate": {"angle": 0.015625}, "model": "minecraft:item/compass_17"},
     {"predicate": {"angle": 0.046875}, "model": "minecraft:item/compass_18"},
     {"predicate": {"angle": 0.078125}, "model": "minecraft:item/compass_19"},

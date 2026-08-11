@@ -98,8 +98,7 @@ public class KitCommand {
                                 return 1;
                             } catch (Exception e) { return 0; }
                         }))
-                    // /tomkestookit elite ...：精英怪 / Boss 相关命令
-                    .then(EliteCommand.buildBranch())
+                    // 精英怪 / Boss 命令已取消
                     // /tomkestookit cleanup vote <yes|no> <voteId>：任何玩家均可投票
                     // /tomkestookit cleanup force <all|dim>：仅 OP，跳过投票立即清理
                     .then(CommandManager.literal("cleanup")

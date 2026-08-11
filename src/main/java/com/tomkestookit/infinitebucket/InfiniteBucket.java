@@ -66,7 +66,7 @@ public final class InfiniteBucket {
 
         com.tomkestookit.materials.ItemQualityTag.append(stack,
             com.tomkestookit.materials.ItemQualityTag.Quality.RARE,
-            "3×3 合成 §8· §7十字铁块 + 炼药锅 + 桶");
+            "3×3 合成 §8· §7底部V形铁块 + 炼药锅 + 桶");
 
         return stack;
     }

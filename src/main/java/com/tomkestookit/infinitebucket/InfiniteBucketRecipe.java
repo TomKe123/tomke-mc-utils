@@ -7,12 +7,13 @@ import net.minecraft.item.Items;
 /**
  * 无限水/岩浆桶合成配方判定：
  *
- * 3×3 十字形：
- *   . 铁块 .
- *   铁块 炼药锅 铁块+水桶/岩浆桶
- *   . 铁块 .
+ * 3×3 V字形：
+ *   . 水桶/岩浆桶 .      槽位 0 1 2
+ *   . 炼药锅     .      槽位 3 4 5
+ *   铁块 铁块 铁块        槽位 6 7 8
  *
- * 实际上是 4 个铁块 + 1 个炼药锅（中心）+ 1 个水桶/岩浆桶（任意一格四周）。
+ * 桶在顶部中间（slot 1），炼药锅在中间（slot 4），
+ * 底部三个铁块（slot 6/7/8），其余全空。
  */
 public final class InfiniteBucketRecipe {
 
@@ -22,39 +23,31 @@ public final class InfiniteBucketRecipe {
     public static InfiniteBucket.BucketType match3x3(RecipeInputInventory input) {
         if (input.getWidth() != 3 || input.getHeight() != 3) return null;
 
-        // 中心必须是炼药锅
-        ItemStack center = input.getStack(4);
-        if (center.getItem() != Items.CAULDRON) return null;
+        // 顶部中间：水桶或岩浆桶
+        ItemStack bucketSlot = input.getStack(1);
+        InfiniteBucket.BucketType type;
+        if (bucketSlot.getItem() == Items.WATER_BUCKET) {
+            type = InfiniteBucket.BucketType.WATER;
+        } else if (bucketSlot.getItem() == Items.LAVA_BUCKET) {
+            type = InfiniteBucket.BucketType.LAVA;
+        } else {
+            return null;
+        }
 
-        // 四角必须为空
-        int[] corners = {0, 2, 6, 8};
-        for (int i : corners) {
+        // 中间：炼药锅
+        if (input.getStack(4).getItem() != Items.CAULDRON) return null;
+
+        // 底部三个：铁块
+        if (input.getStack(6).getItem() != Items.IRON_BLOCK) return null;
+        if (input.getStack(7).getItem() != Items.IRON_BLOCK) return null;
+        if (input.getStack(8).getItem() != Items.IRON_BLOCK) return null;
+
+        // 其余槽位必须为空：slot 0, 2, 3, 5
+        int[] empty = {0, 2, 3, 5};
+        for (int i : empty) {
             if (!input.getStack(i).isEmpty()) return null;
         }
 
-        // 十字四个位置：必须 3 个铁块 + 1 个水桶或岩浆桶
-        int[] cross = {1, 3, 5, 7};
-        int ironCount = 0;
-        InfiniteBucket.BucketType foundType = null;
-
-        for (int i : cross) {
-            ItemStack s = input.getStack(i);
-            if (s.isEmpty()) return null;
-            if (s.getItem() == Items.IRON_BLOCK) {
-                ironCount++;
-            } else if (s.getItem() == Items.WATER_BUCKET) {
-                if (foundType != null) return null; // 不能有两个桶
-                foundType = InfiniteBucket.BucketType.WATER;
-            } else if (s.getItem() == Items.LAVA_BUCKET) {
-                if (foundType != null) return null;
-                foundType = InfiniteBucket.BucketType.LAVA;
-            } else {
-                return null; // 非法物品
-            }
-        }
-
-        // 必须恰好 3 个铁块 + 1 个桶
-        if (ironCount != 3 || foundType == null) return null;
-        return foundType;
+        return type;
     }
 }

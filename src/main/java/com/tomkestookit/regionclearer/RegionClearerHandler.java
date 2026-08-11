@@ -44,8 +44,10 @@ public final class RegionClearerHandler {
 
     /** 一维硬边界。*/
     private static final int MAX_EDGE = 5120;
-    /** 体积硬边界：预扫描是同步的，太大会卡主线程。5M 大约相当于 172³。*/
-    private static final int MAX_VOLUME = 5_000_000;
+    /** 掉落物上限：超过此数量则清理时不产生掉落，避免卡顿。*/
+    private static final int MAX_VOLUME_WITH_DROPS = 5_000_000;
+    /** 清除方块数的绝对上限（int 类型上限）。*/
+    private static final int MAX_TOTAL_BLOCKS = Integer.MAX_VALUE;
     /** 触发分批的方块数阈值：以下一次执行完；以上分批。*/
     private static final int SYNC_LIMIT = 32768;
     /** 分批：每 40 tick（2 秒）跑一次。*/
@@ -74,15 +76,17 @@ public final class RegionClearerHandler {
         public final BlockPos min;
         public final BlockPos max;
         public final int count;
+        public final boolean dropItems; // 是否产生掉落物
 
         Pending(UUID player, ServerWorld world, RegionClearer.ClearerTier tier,
-                BlockPos min, BlockPos max, int count) {
+                BlockPos min, BlockPos max, int count, boolean dropItems) {
             this.player = player;
             this.world = world;
             this.tier = tier;
             this.min = min;
             this.max = max;
             this.count = count;
+            this.dropItems = dropItems;
         }
     }
 
@@ -93,15 +97,17 @@ public final class RegionClearerHandler {
         final RegionClearer.ClearerTier tier;
         final Deque<BlockPos> queue;
         final int total;
+        final boolean dropItems; // 是否产生掉落物
         int done;
 
         ClearJob(UUID player, ServerWorld world, RegionClearer.ClearerTier tier,
-                 Deque<BlockPos> queue) {
+                 Deque<BlockPos> queue, boolean dropItems) {
             this.player = player;
             this.world = world;
             this.tier = tier;
             this.queue = queue;
             this.total = queue.size();
+            this.dropItems = dropItems;
         }
     }
 
@@ -210,38 +216,49 @@ public final class RegionClearerHandler {
             return;
         }
         long volume = dx * dy * dz;
-        if (volume > MAX_VOLUME) {
+        if (volume > MAX_TOTAL_BLOCKS) {
             player.sendMessage(Text.literal(String.format(
-                "§c[区域清除] 区域体积 %d 超过上限 %d，已取消。", volume, MAX_VOLUME)), false);
+                "§c[区域清除] 区域体积 %d 超过绝对上限 %d，已取消。", volume, MAX_TOTAL_BLOCKS)), false);
             PENDING.remove(player.getUuid());
             return;
         }
 
-        // 只做未加载 chunk 检查；不再验证方块能否被本 tier 挖 —— 区域内一切非空气方块都会被清除。
-        int total = 0;
-        int unloadedChunks = 0;
-        BlockPos.Mutable m = new BlockPos.Mutable();
-        for (int y = min.getY(); y <= max.getY(); y++) {
-            for (int x = min.getX(); x <= max.getX(); x++) {
-                for (int z = min.getZ(); z <= max.getZ(); z++) {
-                    m.set(x, y, z);
-                    if (!world.isChunkLoaded(x >> 4, z >> 4)) {
-                        unloadedChunks++;
-                        continue;
+        // 超过 5M 体积的区域：跳过精确预扫描（太慢），不产生掉落物
+        boolean dropItems = volume <= MAX_VOLUME_WITH_DROPS;
+        int total;
+
+        if (!dropItems) {
+            // 大区域：不做预扫描，估算为 volume 本身（上限 int）
+            total = volume > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) volume;
+            player.sendMessage(Text.literal(
+                "§e[区域清除] §c区域体积超过 5M，此次清理不会掉落任何物品。§7(避免卡顿)"), false);
+        } else {
+            // 正常区域：精确预扫描
+            total = 0;
+            int unloadedChunks = 0;
+            BlockPos.Mutable m = new BlockPos.Mutable();
+            for (int y = min.getY(); y <= max.getY(); y++) {
+                for (int x = min.getX(); x <= max.getX(); x++) {
+                    for (int z = min.getZ(); z <= max.getZ(); z++) {
+                        m.set(x, y, z);
+                        if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+                            unloadedChunks++;
+                            continue;
+                        }
+                        if (!world.getBlockState(m).isAir()) total++;
                     }
-                    if (!world.getBlockState(m).isAir()) total++;
                 }
+            }
+
+            if (unloadedChunks > 0) {
+                player.sendMessage(Text.literal(String.format(
+                    "§c[区域清除] 区域内有 %d 个未加载方块位置，请靠近再选取，已取消。", unloadedChunks)), false);
+                PENDING.remove(player.getUuid());
+                return;
             }
         }
 
-        if (unloadedChunks > 0) {
-            player.sendMessage(Text.literal(String.format(
-                "§c[区域清除] 区域内有 %d 个未加载方块位置，请靠近再选取，已取消。", unloadedChunks)), false);
-            PENDING.remove(player.getUuid());
-            return;
-        }
-
-        Pending pending = new Pending(player.getUuid(), world, tier, min, max, total);
+        Pending pending = new Pending(player.getUuid(), world, tier, min, max, total, dropItems);
         PENDING.put(player.getUuid(), pending);
 
         int batches = (total + BATCH_SIZE - 1) / BATCH_SIZE;
@@ -315,7 +332,7 @@ public final class RegionClearerHandler {
             }
         }
 
-        ClearJob job = new ClearJob(player.getUuid(), p.world, tier, queue);
+        ClearJob job = new ClearJob(player.getUuid(), p.world, tier, queue, p.dropItems);
         if (queue.size() <= SYNC_LIMIT) {
             // 一次性跑完
             runBatch(job, queue.size());
@@ -443,24 +460,28 @@ public final class RegionClearerHandler {
             if (state.isAir()) continue;
 
             // 掉落策略：
-            //   - 基岩：不掉落
-            //   - 流体（水 / 岩浆 / 粉雪 / 其它 FluidBlock）：不掉落，直接抹掉
-            //   - 其他 hardness < 0 的方块（命令方块 / 屏障 / 门框等）：不掉落
-            //   - 其余：按 vanilla loot table 掉落（工具用 tier 对应干净斧头）
+            //   - job.dropItems = false：无论什么方块，都不掉落（超大区域模式）
+            //   - job.dropItems = true：
+            //       - 基岩：不掉落
+            //       - 流体（水 / 岩浆 / 粉雪 / 其它 FluidBlock）：不掉落，直接抹掉
+            //       - 其他 hardness < 0 的方块（命令方块 / 屏障 / 门框等）：不掉落
+            //       - 其余：按 vanilla loot table 掉落（工具用 tier 对应干净斧头）
             // waterlogged 方块（楼梯 / 栅栏泡水）本身是可掉落 block，不算流体；
             // 只有 FluidBlock 本体（水源 / 岩浆源及流动）视为流体不掉落
-            boolean isFluid = state.getBlock() instanceof FluidBlock;
-            boolean shouldDrop;
-            if (state.isOf(Blocks.BEDROCK) || isFluid) {
-                shouldDrop = false;
-            } else {
-                float hardness;
-                try {
-                    hardness = state.getHardness(null, null);
-                } catch (Throwable t) {
-                    hardness = 0f; // 读取失败按可挖处理
+            boolean shouldDrop = job.dropItems;
+            if (shouldDrop) {
+                boolean isFluid = state.getBlock() instanceof FluidBlock;
+                if (state.isOf(Blocks.BEDROCK) || isFluid) {
+                    shouldDrop = false;
+                } else {
+                    float hardness;
+                    try {
+                        hardness = state.getHardness(null, null);
+                    } catch (Throwable t) {
+                        hardness = 0f; // 读取失败按可挖处理
+                    }
+                    shouldDrop = hardness >= 0f;
                 }
-                shouldDrop = hardness >= 0f;
             }
             if (shouldDrop) {
                 BlockEntity be = state.hasBlockEntity() ? world.getBlockEntity(pos) : null;

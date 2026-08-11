@@ -69,6 +69,9 @@ public class TomkesTookitMod implements ModInitializer {
         TrinketEffectHandler.register();
         com.tomkestookit.trinket.TrinketCommand.register();
         com.tomkestookit.reforge.AutoMenderHandler.register();
+
+        // Create 模组兼容：溺尸掉粗锌锭
+        com.tomkestookit.compat.CreateCompat.register();
         com.tomkestookit.menu.TrashCanMenu.register();
         PerPlayerSpawnCap.register();
         SugarTntHandler.register();
@@ -76,14 +79,16 @@ public class TomkesTookitMod implements ModInitializer {
         PortableCommand.register();
         PlayerTeleport.register();
 
-        // 精英怪 + Boss 系统
-        com.tomkestookit.elite.EliteMobHandler.register();
-        com.tomkestookit.elite.ThreatRating.register();
-        com.tomkestookit.elite.CombatFrenzyTracker.register();
-        com.tomkestookit.elite.EliteDebuffAura.register();
-        com.tomkestookit.elite.skill.EliteSkillExecutor.register();
-        com.tomkestookit.boss.BossSummonHandler.register();
-        com.tomkestookit.boss.BossBarManager.register();
+        // 精英怪 + Boss 系统已取消（保留代码但不注册）
+        // com.tomkestookit.elite.EliteMobHandler.register();
+        // com.tomkestookit.elite.ThreatRating.register();
+        // com.tomkestookit.elite.CombatFrenzyTracker.register();
+        // com.tomkestookit.elite.EliteDebuffAura.register();
+        // com.tomkestookit.elite.skill.EliteSkillExecutor.register();
+        // com.tomkestookit.boss.BossSummonHandler.register();
+        // com.tomkestookit.boss.BossBarManager.register();
+        // 素材掉落改由独立事件注册（原来由 EliteMobDropMixin 触发）
+        com.tomkestookit.materials.MaterialDropHandler.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             TomkesTookitConfig.load(server);
@@ -99,8 +104,9 @@ public class TomkesTookitMod implements ModInitializer {
             AutoCrafterTracker.load(server);
             PotionCauldronLabel.cleanupLoadedOrphans(server);
             com.tomkestookit.logistics.LogisticsTracker.load(server);
-            com.tomkestookit.elite.ThreatRating.load(server);
-            com.tomkestookit.boss.BossCooldownStore.load(server);
+            // 精英怪 + Boss 系统已取消
+            // com.tomkestookit.elite.ThreatRating.load(server);
+            // com.tomkestookit.boss.BossCooldownStore.load(server);
             int cleaned = com.tomkestookit.logistics.LogisticsHandler.sweepOrphans(server);
             int cleanedCrafters = AutoCrafterHandler.sweepOrphans(server);
             if (cleaned > 0) {

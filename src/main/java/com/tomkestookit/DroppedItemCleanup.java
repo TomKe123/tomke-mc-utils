@@ -47,8 +47,13 @@ public final class DroppedItemCleanup {
 
     /** 玩家发起的全局投票（跨维度）。null 时表示无进行中的投票。*/
     private static PlayerVote CURRENT_VOTE = null;
-    /** 上一次投票结束时的 tick，用于冷却判定。*/
-    private static long lastVoteFinishTick = Long.MIN_VALUE;
+    /**
+     * 上一次投票结束时的 tick，用于冷却判定。
+     * 初始 -VOTE_COOLDOWN_TICKS 保证首次调用时 `(lastFinish + cooldown) - now` 恰好为 -now（负值 = 无冷却）。
+     * 不用 Long.MIN_VALUE：`Long.MIN_VALUE + cooldown - now` 在 now 较大时会下溢 wraparound 成巨大正值，
+     * 导致 UI 显示很离谱的冷却时间（此 BUG 的根因）。
+     */
+    private static long lastVoteFinishTick = -VOTE_COOLDOWN_TICKS;
     /** 全局投票 bossbar。*/
     private static final ServerBossBar VOTE_BAR = new ServerBossBar(
         Text.literal("§b[清理投票]"), BossBar.Color.BLUE, BossBar.Style.NOTCHED_10);

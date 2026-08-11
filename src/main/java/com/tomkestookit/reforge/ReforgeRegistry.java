@@ -97,6 +97,7 @@ public final class ReforgeRegistry {
             Items.FEATHER, Items.FEATHER);
 
         // 中心 netherite_ingot（图标），围 8 ancient_debris → "泰坦=下界最硬"
+        // 叠加修复：per-slot UUID 派生使得同一 def 可叠在多件护甲上
         reg("titan_plate", "泰坦铭板", Items.NETHERITE_INGOT,
             "generic.max_health", 4.0, 0, "any_armor",
             "b1a00001-0000-0000-0000-000000000007", 25,
@@ -435,21 +436,60 @@ public final class ReforgeRegistry {
         return nbt.getString(NBT_KEY);
     }
 
-    /** 检查装备上是否已有某块重铸石（通过 UUID 检测）。*/
+    /**
+     * 检查装备上是否已有某块重铸石。
+     * 优先看 APPLIED_TAG（id 字符串），命中直接判定已应用；
+     * 再回退到 UUID 检测（同时也检查 per-slot 派生 UUID）。
+     */
     public static boolean alreadyApplied(ItemStack equipment, ReforgeDef def) {
         NbtCompound nbt = equipment.getNbt();
-        if (nbt == null || !nbt.contains("AttributeModifiers")) return false;
+        if (nbt == null) return false;
+        // 优先：applied id 列表
+        if (nbt.contains(APPLIED_TAG)) {
+            NbtList applied = nbt.getList(APPLIED_TAG, 8);
+            for (int i = 0; i < applied.size(); i++) {
+                if (def.id.equals(applied.getString(i))) return true;
+            }
+        }
+        // 回退：UUID（涵盖旧数据 + per-slot 派生 UUID）
+        if (!nbt.contains("AttributeModifiers")) return false;
         NbtList attrs = nbt.getList("AttributeModifiers", 10);
+        String slotStr = resolveSlot(def, equipment);
+        UUID slotUuid = perSlotUuid(def, slotStr);
         for (int i = 0; i < attrs.size(); i++) {
             NbtCompound m = attrs.getCompound(i);
             if (m.contains("UUID")) {
                 try {
                     UUID existing = NbtHelper.toUuid(m.get("UUID"));
-                    if (def.uuid.equals(existing)) return true;
+                    if (def.uuid.equals(existing) || slotUuid.equals(existing)) return true;
                 } catch (Exception ignored) { /* 非标准 UUID 格式，跳过 */ }
             }
         }
         return false;
+    }
+
+    /**
+     * 派生 per-slot UUID：对 any_armor 类重铸石，让不同 slot 得到不同 UUID，
+     * 使得同一 def 可以叠加在多件护甲上（修复泰坦铭板等只能生效一次的 BUG）。
+     * 对 mainhand / offhand / feet 等固定 slot 定义，返回原始 UUID 保持兼容。
+     */
+    private static UUID perSlotUuid(ReforgeDef def, String slotStr) {
+        if (!"any_armor".equals(def.slot) && !"any".equals(def.slot)) {
+            return def.uuid;
+        }
+        // 只对 4 件护甲 slot 派生；其他情况返回原 UUID
+        return switch (slotStr) {
+            case "head"  -> deriveUuid(def.uuid, 1);
+            case "chest" -> deriveUuid(def.uuid, 2);
+            case "legs"  -> deriveUuid(def.uuid, 3);
+            case "feet"  -> deriveUuid(def.uuid, 4);
+            default      -> def.uuid;
+        };
+    }
+
+    /** 从 base UUID 派生一个稳定的变体（异或 low 64 位的一个盐）。*/
+    private static UUID deriveUuid(UUID base, int salt) {
+        return new UUID(base.getMostSignificantBits(), base.getLeastSignificantBits() ^ ((long) salt * 0x9E3779B97F4A7C15L));
     }
 
     /** 把重铸石属性追加到装备的 AttributeModifiers。*/
@@ -468,17 +508,20 @@ public final class ReforgeRegistry {
         // 确定 slot 字符串
         String slotStr = resolveSlot(def, equipment);
 
+        // 对 any_armor 类重铸石，把 UUID 按 slot 派生成不同值，
+        // 避免同一 def 在多件装备上因 UUID 相同而被 Minecraft 去重（叠加修复）。
+        UUID modifierUuid = perSlotUuid(def, slotStr);
+
         NbtCompound modifier = new NbtCompound();
         modifier.putString("AttributeName", def.attribute);
         modifier.putString("Name", "tomkestookit:reforge_" + def.id);
         modifier.putDouble("Amount", def.amount);
         modifier.putInt("Operation", def.operation);
         modifier.putString("Slot", slotStr);
-        modifier.put("UUID", NbtHelper.fromUuid(def.uuid));
+        modifier.put("UUID", NbtHelper.fromUuid(modifierUuid));
         attrs.add(modifier);
 
         nbt.put("AttributeModifiers", attrs);
-
         // 记录已应用的重铸到一个标记列表（给 lore 展示用）
         NbtList applied = nbt.contains(APPLIED_TAG) ? nbt.getList(APPLIED_TAG, 8) : new NbtList();
         applied.add(NbtString.of(def.id));

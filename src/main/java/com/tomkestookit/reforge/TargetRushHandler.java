@@ -16,9 +16,13 @@ import java.util.List;
  * 掠食本能（target_rush）逻辑：
  *
  * 触发时机：玩家挥剑动作（左键 swing），不需要命中实体。
- * 在 5 格内寻找最近的对玩家有仇恨（getTarget() == player）的生物，
- * 要求视线无遮挡（不可穿墙），传送到目标面前并造成一次伤害。
- * 无 CD——每次挥剑都能触发。
+ * 只对当前把玩家作为仇恨目标的敌对生物生效（{@code mob.getTarget() == player}）。
+ * 在 5 格内寻找最近的仇恨怪，检查视线 + 突进路径：
+ *   - 玩家眼睛 → 怪物中心 视线可达
+ *   - 玩家当前位置 → 突进落点 直线路径无方块阻挡
+ * 满足条件则传送到目标面前，造成一次伤害。
+ *
+ * 无冷却——每次挥剑都能重新触发。
  */
 public final class TargetRushHandler {
 
@@ -42,7 +46,7 @@ public final class TargetRushHandler {
 
         ServerWorld world = player.getServerWorld();
 
-        // 搜索范围内最近的、对玩家有仇恨的目标
+        // 搜索范围内最近的、对玩家有仇恨的目标（严格条件：mob.getTarget() 必须是本玩家）
         Box searchBox = player.getBoundingBox().expand(RUSH_RADIUS);
         List<MobEntity> candidates = world.getEntitiesByClass(MobEntity.class, searchBox,
             mob -> mob.isAlive()
@@ -73,6 +77,11 @@ public final class TargetRushHandler {
                 }
             }
 
+            // 突进路径检查：玩家当前位置 → 落点，中间不能有方块阻挡
+            if (isPathBlocked(world, player, rushPos)) {
+                return false;
+            }
+
             player.requestTeleport(rushPos.x, rushPos.y, rushPos.z);
             player.setVelocity(0, 0, 0);
             player.networkHandler.sendPacket(
@@ -95,5 +104,33 @@ public final class TargetRushHandler {
             player));
         return result.getType() == HitResult.Type.MISS
             || result.getPos().squaredDistanceTo(targetCenter) < 1.0;
+    }
+
+    /**
+     * 突进路径障碍检查：玩家当前身体中心 → 落点身体中心，若中间有方块碰撞则视为路径被挡。
+     * 分别检查脚部（+0.1y）和头部（+height-0.1y）两条线，任意一条被挡则整个突进取消。
+     */
+    private static boolean isPathBlocked(ServerWorld world, ServerPlayerEntity player, Vec3d rushPos) {
+        double h = player.getHeight();
+        // 脚线
+        Vec3d fromLow = player.getPos().add(0, 0.1, 0);
+        Vec3d toLow = rushPos.add(0, 0.1, 0);
+        // 头线
+        Vec3d fromHigh = player.getPos().add(0, h - 0.1, 0);
+        Vec3d toHigh = rushPos.add(0, h - 0.1, 0);
+
+        HitResult low = world.raycast(new RaycastContext(
+            fromLow, toLow,
+            RaycastContext.ShapeType.COLLIDER,
+            RaycastContext.FluidHandling.NONE,
+            player));
+        if (low.getType() != HitResult.Type.MISS) return true;
+
+        HitResult high = world.raycast(new RaycastContext(
+            fromHigh, toHigh,
+            RaycastContext.ShapeType.COLLIDER,
+            RaycastContext.FluidHandling.NONE,
+            player));
+        return high.getType() != HitResult.Type.MISS;
     }
 }

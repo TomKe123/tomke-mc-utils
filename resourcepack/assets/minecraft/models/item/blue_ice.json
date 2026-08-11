@@ -1,8 +1,5 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "minecraft:block/blue_ice"
-  },
+  "parent": "minecraft:block/blue_ice",
   "overrides": [
     {"predicate": {"custom_model_data": 500003}, "model": "tomkestookit:item/boss/frost_lich"}
   ]
