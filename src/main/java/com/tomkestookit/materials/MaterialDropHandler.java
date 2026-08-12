@@ -94,7 +94,7 @@ public final class MaterialDropHandler {
         if (def == null) return;
         int count = 1 + rng.nextInt(Math.max(1, maxCount));
         ItemEntity ie = new ItemEntity(world, pos.x, pos.y + 0.5, pos.z,
-            MobMaterialRegistry.build(def, count));
+            new net.minecraft.item.ItemStack(def.icon(), count));
         ie.setPickupDelay(10);
         world.spawnEntity(ie);
     }

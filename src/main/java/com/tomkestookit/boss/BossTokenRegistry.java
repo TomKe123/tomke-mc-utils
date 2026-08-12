@@ -1,7 +1,6 @@
 package com.tomkestookit.boss;
 
 import com.tomkestookit.materials.CustomModelDataRegistry;
-import com.tomkestookit.materials.MobMaterialRegistry;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.boss.BossBar;
 import net.minecraft.inventory.RecipeInputInventory;
@@ -19,9 +18,7 @@ import java.util.List;
 /**
  * Boss 定义注册表。每个 BossDef 描述一种可召唤 Boss 的属性、合成配方、外观。
  *
- * 合成材料改用怪物专属素材（NBT 匹配）：
- *   - craftingCenter/craftingSurround 是 MobMaterialRegistry 的素材 id
- *   - match3x3 检查 3×3 内每一格的 TomkesTookitMaterial NBT 是否匹配
+ * 合成材料使用 vanilla 物品（红石、灵魂沙、海晶砂粒、萤石粉、末影水晶）。
  */
 public final class BossTokenRegistry {
 
