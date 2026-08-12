@@ -417,10 +417,6 @@ public final class ReforgeRegistry {
 
     /** 根据 reforge id 描述获取途径。*/
     private static String reforgeSource(String id) {
-        // 怪物专属素材系列
-        if (MOB_MATERIAL_REFORGES.contains(id)) {
-            return "3×3 合成 §8· §7需要精英怪掉落素材";
-        }
         // 传奇重铸石
         if ("cosmic_essence".equals(id) || "titan_heart".equals(id)
             || "bedrock_bulwark".equals(id) || "dragon_scale_plate".equals(id))
@@ -559,59 +555,22 @@ public final class ReforgeRegistry {
         return null;
     }
 
-    /** 怪物专属素材系列——这些重铸石的合成材料需要 MobMaterial NBT 物品。*/
-    private static final java.util.Set<String> MOB_MATERIAL_REFORGES = java.util.Set.of(
-        "abyssal_might", "soul_edge", "blood_moon_fury", "void_pierce", "stardust_weight"
-    );
-
     private static boolean matches(net.minecraft.inventory.RecipeInputInventory inv, ReforgeDef def) {
         ItemStack center = inv.getStack(4);
         if (center.isEmpty()) return false;
         // 排除已经是重铸石的（避免用一个重铸石当中心去合另一个）
         if (getId(center) != null) return false;
 
-        boolean requireMobMat = MOB_MATERIAL_REFORGES.contains(def.id);
+        // 中心：vanilla Item 匹配
+        if (center.getItem() != def.recipeCenter) return false;
 
-        // 检查中心
-        if (requireMobMat) {
-            String centerMatId = mobMaterialIdFor(def.recipeCenter);
-            if (centerMatId != null) {
-                if (!com.tomkestookit.materials.MobMaterialRegistry.is(center, centerMatId)) return false;
-            } else {
-                if (center.getItem() != def.recipeCenter) return false;
-            }
-        } else {
-            if (center.getItem() != def.recipeCenter) return false;
-        }
-
-        // 检查外围 8 格
+        // 外围 8 格：vanilla Item 匹配
         int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
-        if (requireMobMat) {
-            String surroundMatId = mobMaterialIdFor(def.recipeSurround);
-            for (int i : surround) {
-                ItemStack s = inv.getStack(i);
-                if (surroundMatId != null) {
-                    if (!com.tomkestookit.materials.MobMaterialRegistry.is(s, surroundMatId)) return false;
-                } else {
-                    if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
-                }
-            }
-        } else {
-            for (int i : surround) {
-                ItemStack s = inv.getStack(i);
-                if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
-            }
+        for (int i : surround) {
+            ItemStack s = inv.getStack(i);
+            if (s.isEmpty() || s.getItem() != def.recipeSurround) return false;
         }
         return true;
-    }
-
-    /** 判断一个 Item 是否对应某个 MobMaterial 的 icon；是则返回该素材 id。*/
-    private static String mobMaterialIdFor(Item item) {
-        for (com.tomkestookit.materials.MobMaterialRegistry.MaterialDef mat :
-                com.tomkestookit.materials.MobMaterialRegistry.all()) {
-            if (mat.icon() == item) return mat.id();
-        }
-        return null;
     }
 
     public static boolean isWeapon(ItemStack stack) {

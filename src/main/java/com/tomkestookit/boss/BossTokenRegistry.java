@@ -26,31 +26,31 @@ import java.util.List;
 public final class BossTokenRegistry {
 
     public record BossDef(String bossId, String displayName, EntityType<?> mobType,
-                          Item tokenIcon, String craftingCenter, String craftingSurround,
+                          Item tokenIcon, Item craftingCenter, Item craftingSurround,
                           double healthMult, double damageMult, double followRange,
                           BossBar.Color barColor, BossBar.Style barStyle, int xpReward) {}
 
     public static final List<BossDef> ALL = new ArrayList<>();
 
     static {
-        // 下界监守者：8 灵魂结晶 + 血月精华（灵魂系不死主题）
+        // 下界监守者：8 灵魂沙 + 红石（灵魂系不死主题）
         ALL.add(new BossDef("infernal_warden", "下界监守者", EntityType.WITHER_SKELETON,
-                Items.WITHER_SKELETON_SKULL, "blood_moon_essence", "soul_crystal",
+                Items.WITHER_SKELETON_SKULL, Items.REDSTONE, Items.SOUL_SAND,
                 20, 5, 60, BossBar.Color.RED, BossBar.Style.NOTCHED_12, 1500));
 
-        // 深渊之王：8 深邃碎片 + 血月精华（水系主题）
+        // 深渊之王：8 海晶砂粒 + 红石（水系主题）
         ALL.add(new BossDef("abyssal_guardian", "深渊之王", EntityType.ELDER_GUARDIAN,
-                Items.HEART_OF_THE_SEA, "blood_moon_essence", "abyssal_shard",
+                Items.HEART_OF_THE_SEA, Items.REDSTONE, Items.PRISMARINE_CRYSTALS,
                 25, 4, 50, BossBar.Color.BLUE, BossBar.Style.NOTCHED_10, 1200));
 
-        // 永冻巫妖：8 星尘 + 血月精华（远古/时空主题）
+        // 永冻巫妖：8 萤石粉 + 红石（远古/时空主题）
         ALL.add(new BossDef("frost_lich", "永冻巫妖", EntityType.SKELETON,
-                Items.BLUE_ICE, "blood_moon_essence", "stardust",
+                Items.BLUE_ICE, Items.REDSTONE, Items.GLOWSTONE_DUST,
                 18, 6, 40, BossBar.Color.WHITE, BossBar.Style.NOTCHED_6, 1000));
 
-        // 虚空幼龙：8 血月精华 + 虚空之核（终极配方）
+        // 虚空幼龙：8 红石 + 末影水晶（终极配方）
         ALL.add(new BossDef("void_dragon_child", "虚空幼龙", EntityType.WITHER,
-                Items.DRAGON_EGG, "void_core", "blood_moon_essence",
+                Items.DRAGON_EGG, Items.END_CRYSTAL, Items.REDSTONE,
                 30, 7, 80, BossBar.Color.PURPLE, BossBar.Style.NOTCHED_20, 2000));
     }
 
@@ -78,11 +78,10 @@ public final class BossTokenRegistry {
 
     private static boolean matchesDef(RecipeInputInventory inv, BossDef def) {
         ItemStack center = inv.getStack(4);
-        if (!MobMaterialRegistry.is(center, def.craftingCenter())) return false;
+        if (center.getItem() != def.craftingCenter()) return false;
         int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
         for (int i : surround) {
-            ItemStack s = inv.getStack(i);
-            if (!MobMaterialRegistry.is(s, def.craftingSurround())) return false;
+            if (inv.getStack(i).getItem() != def.craftingSurround()) return false;
         }
         return true;
     }

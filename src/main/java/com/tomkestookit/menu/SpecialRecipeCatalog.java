@@ -289,58 +289,30 @@ public final class SpecialRecipeCatalog {
 
         // ---- 重铸石 ----
         // 3×3 合成：中心=recipeCenter，四周=recipeSurround；合成后拿去铁砧敲装备
-        // 怪物专属素材系列的重铸石展示 NBT 物品
-        java.util.Set<String> mobMatReforges = java.util.Set.of(
-            "abyssal_might", "soul_edge", "blood_moon_fury", "void_pierce", "stardust_weight"
-        );
+        // 怪物素材系列重铸石现在用 vanilla 物品替代，直接展示 Item 类型即可
         for (ReforgeRegistry.ReforgeDef def : ReforgeRegistry.all()) {
-            if (mobMatReforges.contains(def.id())) {
-                // 使用完整 NBT 的 MobMaterial ItemStack
-                net.minecraft.item.ItemStack centerStack = buildMobMatStack(def.recipeCenter());
-                net.minecraft.item.ItemStack surroundStack = buildMobMatStack(def.recipeSurround());
-                list.add(new SpecialRecipeEntry(
-                    "reforge_" + def.id(),
-                    () -> ReforgeRegistry.buildStack(def),
-                    new net.minecraft.item.ItemStack[] {
-                        surroundStack.copy(), surroundStack.copy(), surroundStack.copy(),
-                        surroundStack.copy(), centerStack.copy(),   surroundStack.copy(),
-                        surroundStack.copy(), surroundStack.copy(), surroundStack.copy()
-                    },
-                    def.lore()
-                ));
-            } else {
-                Item center = def.recipeCenter();
-                Item surround = def.recipeSurround();
-                list.add(new SpecialRecipeEntry(
-                    "reforge_" + def.id(),
-                    () -> ReforgeRegistry.buildStack(def),
-                    new Item[] {
-                        surround, surround, surround,
-                        surround, center,   surround,
-                        surround, surround, surround
-                    },
-                    def.lore()
-                ));
-            }
+            Item center = def.recipeCenter();
+            Item surround = def.recipeSurround();
+            list.add(new SpecialRecipeEntry(
+                "reforge_" + def.id(),
+                () -> ReforgeRegistry.buildStack(def),
+                new Item[] {
+                    surround, surround, surround,
+                    surround, center,   surround,
+                    surround, surround, surround
+                },
+                def.lore()
+            ));
         }
 
         // ---- Boss 令牌 ----
-        // 材料是 MobMaterialRegistry 的 NBT 素材，展示用完整 NBT ItemStack
+        // 材料改用 vanilla 物品，不再用 MobMaterial NBT ItemStack
         for (com.tomkestookit.boss.BossTokenRegistry.BossDef bdef :
                 com.tomkestookit.boss.BossTokenRegistry.ALL) {
-            com.tomkestookit.materials.MobMaterialRegistry.MaterialDef centerMat =
-                com.tomkestookit.materials.MobMaterialRegistry.byId(bdef.craftingCenter());
-            com.tomkestookit.materials.MobMaterialRegistry.MaterialDef surroundMat =
-                com.tomkestookit.materials.MobMaterialRegistry.byId(bdef.craftingSurround());
-            if (centerMat == null || surroundMat == null) continue;
-
-            net.minecraft.item.ItemStack bCenter = com.tomkestookit.materials.MobMaterialRegistry.build(centerMat, 1);
-            net.minecraft.item.ItemStack bSurround = com.tomkestookit.materials.MobMaterialRegistry.build(surroundMat, 1);
-
             List<String> bossLore = new ArrayList<>();
             bossLore.add("§8「击败精英怪，凝聚为召唤令牌。」");
-            bossLore.add("§7中心：§f" + centerMat.rarity() + centerMat.name());
-            bossLore.add("§7外围：§f" + surroundMat.rarity() + surroundMat.name() + " ×8");
+            bossLore.add("§7中心：§f" + bdef.craftingCenter().getName().getString());
+            bossLore.add("§7外围：§f" + bdef.craftingSurround().getName().getString() + " ×8");
             bossLore.add("§c§lBoss 令牌 §8- 右键地面 3s 召唤");
             bossLore.add("§8生命 ×" + fmt(bdef.healthMult()) + "  伤害 ×" + fmt(bdef.damageMult()));
             bossLore.add("§8同服上限 3 只 · 距出生点 200 格以上");
@@ -349,30 +321,26 @@ public final class SpecialRecipeCatalog {
             list.add(new SpecialRecipeEntry(
                 "boss_" + bdef.bossId(),
                 () -> com.tomkestookit.boss.BossTokenRegistry.buildTokenStack(bdef),
-                new net.minecraft.item.ItemStack[] {
-                    bSurround.copy(), bSurround.copy(), bSurround.copy(),
-                    bSurround.copy(), bCenter.copy(),   bSurround.copy(),
-                    bSurround.copy(), bSurround.copy(), bSurround.copy()
+                new Item[] {
+                    bdef.craftingSurround(), bdef.craftingSurround(), bdef.craftingSurround(),
+                    bdef.craftingSurround(), bdef.craftingCenter(),   bdef.craftingSurround(),
+                    bdef.craftingSurround(), bdef.craftingSurround(), bdef.craftingSurround()
                 },
                 bossLore
             ));
         }
 
         // ---- 原创武器 ----
-        // 合成中心是 MobMaterial NBT 物品，展示时也用带 NBT 的完整 ItemStack
+        // 合成中心现在是 vanilla 物品，不需要 buildMobMatStack
         for (com.tomkestookit.materials.OriginalWeaponRegistry.WeaponDef wd :
                 com.tomkestookit.materials.OriginalWeaponRegistry.all()) {
-            // 中心：尝试映射到 MobMaterial，有则用完整 NBT 版；否则 fallback 到 vanilla item
-            net.minecraft.item.ItemStack wCenter = buildWeaponCenterStack(wd);
-            net.minecraft.item.ItemStack wSurround = new net.minecraft.item.ItemStack(wd.surroundItem());
-
             list.add(new SpecialRecipeEntry(
                 "weapon_" + wd.id(),
                 () -> com.tomkestookit.materials.OriginalWeaponRegistry.buildStack(wd),
-                new net.minecraft.item.ItemStack[] {
-                    wSurround.copy(), wSurround.copy(), wSurround.copy(),
-                    wSurround.copy(), wCenter.copy(),   wSurround.copy(),
-                    wSurround.copy(), wSurround.copy(), wSurround.copy()
+                new Item[] {
+                    wd.surroundItem(), wd.surroundItem(), wd.surroundItem(),
+                    wd.surroundItem(), wd.centerItem(),   wd.surroundItem(),
+                    wd.surroundItem(), wd.surroundItem(), wd.surroundItem()
                 },
                 wd.lore()
             ));
@@ -471,22 +439,5 @@ public final class SpecialRecipeCatalog {
     private static String fmt(double v) {
         if (v == Math.floor(v)) return String.valueOf((int) v);
         return String.valueOf(v);
-    }
-
-    /** 武器中心物品 → 对应的 MobMaterial NBT ItemStack（有映射时）。*/
-    private static net.minecraft.item.ItemStack buildWeaponCenterStack(
-            com.tomkestookit.materials.OriginalWeaponRegistry.WeaponDef wd) {
-        return buildMobMatStack(wd.centerItem());
-    }
-
-    /** Item → 如果是 MobMaterial icon 则返回带 NBT 的完整 ItemStack，否则返回 vanilla stack。*/
-    private static net.minecraft.item.ItemStack buildMobMatStack(Item item) {
-        for (com.tomkestookit.materials.MobMaterialRegistry.MaterialDef mat :
-                com.tomkestookit.materials.MobMaterialRegistry.all()) {
-            if (mat.icon() == item) {
-                return com.tomkestookit.materials.MobMaterialRegistry.build(mat, 1);
-            }
-        }
-        return new net.minecraft.item.ItemStack(item);
     }
 }

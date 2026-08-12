@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "CMC",
+    " C "
+  ],
+  "key": {
+    "C": {"item": "minecraft:cobblestone"},
+    "M": {"item": "minecraft:magma_block"}
+  },
+  "result": {
+    "item": "minecraft:netherrack",
+    "count": 4
+  }
+}

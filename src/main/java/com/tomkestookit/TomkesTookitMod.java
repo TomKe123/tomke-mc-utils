@@ -69,6 +69,7 @@ public class TomkesTookitMod implements ModInitializer {
         TrinketEffectHandler.register();
         com.tomkestookit.trinket.TrinketCommand.register();
         com.tomkestookit.reforge.AutoMenderHandler.register();
+        com.tomkestookit.reforge.ReforgeRefreshHandler.register();
 
         // Create 模组兼容：溺尸掉粗锌锭
         com.tomkestookit.compat.CreateCompat.register();

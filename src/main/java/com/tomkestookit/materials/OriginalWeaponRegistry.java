@@ -185,28 +185,12 @@ public final class OriginalWeaponRegistry {
 
     private static boolean matches(net.minecraft.inventory.RecipeInputInventory inv, WeaponDef def) {
         ItemStack center = inv.getStack(4);
-        // 中心必须是对应的 MobMaterial NBT 物品（不能用普通原版物品代替）
-        String matId = materialIdForCenter(def);
-        if (matId != null) {
-            if (!com.tomkestookit.materials.MobMaterialRegistry.is(center, matId)) return false;
-        } else {
-            if (center.getItem() != def.centerItem()) return false;
-        }
+        // 中心必须是对应的 vanilla 物品（原 MobMaterial 现在直接用 icon item 替代）
+        if (center.getItem() != def.centerItem()) return false;
         int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
         for (int i : surround) {
             if (inv.getStack(i).getItem() != def.surroundItem()) return false;
         }
         return true;
-    }
-
-    /** 根据 centerItem 映射到 MobMaterial id（如果有对应关系）。*/
-    private static String materialIdForCenter(WeaponDef def) {
-        Item c = def.centerItem();
-        if (c == Items.REDSTONE) return "blood_moon_essence";
-        if (c == Items.SOUL_SAND) return "soul_crystal";
-        if (c == Items.PRISMARINE_CRYSTALS) return "abyssal_shard";
-        if (c == Items.END_CRYSTAL) return "void_core";
-        if (c == Items.GLOWSTONE_DUST) return "stardust";
-        return null;
     }
 }

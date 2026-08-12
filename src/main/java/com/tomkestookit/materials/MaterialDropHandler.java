@@ -25,20 +25,20 @@ import net.minecraft.util.math.Vec3d;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 怪物专属素材掉落（精英怪系统取消后独立运作）。
+ * 怪物专属素材掉落（精英怪系统取消后已停用）。
  *
- * 死亡时按 vanilla 生物种类骰点低阶材料，低概率掉落；假人击杀跳过。
- * 通过 Fabric ServerLivingEntityEvents.AFTER_DEATH 独立注册。
+ * 之前会在 vanilla 生物死亡时低概率掉落 corrupt_sinew / abyssal_shard / soul_crystal /
+ * stardust。现已全部取消：合成配方改用 vanilla 物品（腐肉、海晶砂粒、灵魂沙、萤石粉等）作为等价物。
+ *
+ * 保留类和 register() 方法作为空实现，避免外部调用点报错。onMobDrop 仍保留但不再注册监听。
  */
 public final class MaterialDropHandler {
 
     private MaterialDropHandler() {}
 
-    /** 注册怪物死亡掉落素材事件。*/
+    /** 已停用：不再注册任何监听。*/
     public static void register() {
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
-            onMobDrop(entity, source);
-        });
+        // 精英怪系统取消后，专属素材掉落一并停用
     }
 
     /**
