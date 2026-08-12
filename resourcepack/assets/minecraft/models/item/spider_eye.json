@@ -4,6 +4,7 @@
     "layer0": "minecraft:item/spider_eye"
   },
   "overrides": [
-    {"predicate": {"custom_model_data": 100027}, "model": "tomkestookit:item/reforge/target_rush"}
+    {"predicate": {"custom_model_data": 100027}, "model": "tomkestookit:item/reforge/target_rush"},
+    {"predicate": {"custom_model_data": 200016}, "model": "tomkestookit:item/trinket/blood_fury"}
   ]
 }

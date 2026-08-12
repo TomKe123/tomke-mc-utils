@@ -6,7 +6,6 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,7 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *   - blood_moon_scythe: 伤害的 15% 回血给攻击者
  *   - abyssal_trident: 直接绕过 30% 护甲（在 amount 修改前重打一次伤害）
  *     注：TAIL 修不了 amount，此处只做视觉/额外伤害逻辑（真正穿甲需 ModifyVariable）
- *   - void_blade: 命中后攻击者向前 3 格瞬移
  *
  * 灵魂收割者的经验加成走 EliteMobDropMixin 或 getXpToDrop（本文件不处理）。
  */
@@ -60,13 +58,6 @@ public abstract class OriginalWeaponEffectMixin {
                     DamageSource pierce = attacker.getDamageSources().magic();
                     victim.damage(pierce, amount * 0.3f);
                 }
-                break;
-
-            case "void_blade":
-                // 命中后 attacker 向前瞬移 3 格
-                Vec3d dir = attacker.getRotationVec(1.0f).normalize();
-                Vec3d target = attacker.getPos().add(dir.multiply(3));
-                attacker.requestTeleport(target.x, target.y, target.z);
                 break;
 
             case "soul_reaper":

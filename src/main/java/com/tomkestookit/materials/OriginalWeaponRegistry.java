@@ -35,8 +35,8 @@ public final class OriginalWeaponRegistry {
         String id,
         String name,
         Item baseItem,           // 底模 Item（决定图标 + 基础耐久 + 附魔支持）
-        double attackDamage,     // 覆盖 vanilla 攻击伤害（含 +1 基础）
-        double attackSpeed,      // 覆盖 vanilla 攻速（负数用绝对值，通常 -2.4 = 快，-3.0 = 铁剑）
+        double attackDamage,     // 目标攻击伤害（例如 15.0）
+        double attackSpeed,      // 目标攻速（例如 1.8，玩家基础 4.0）
         String rarity,           // 颜色代码
         List<String> lore,
         // 合成
@@ -48,7 +48,7 @@ public final class OriginalWeaponRegistry {
 
     static {
         reg("blood_moon_scythe", "血月镰刀", Items.IRON_HOE,
-            8.0, -2.5, "§c",
+            8.0, 1.5, "§c",
             List.of("§8「月光染红时，收割不止麦子。」",
                 "§7攻击 §c8 §8· 攻速 §c1.5",
                 "§7命中回血 15% 造成的伤害（不吸魔法/环境）",
@@ -56,7 +56,7 @@ public final class OriginalWeaponRegistry {
             Items.REDSTONE, Items.IRON_HOE);
 
         reg("soul_reaper", "灵魂收割者", Items.NETHERITE_SWORD,
-            10.0, -2.4, "§5",
+            10.0, 1.6, "§5",
             List.of("§8「灵魂收进刀里，你还想去哪？」",
                 "§7攻击 §510 §8· 攻速 §51.6",
                 "§7击杀怪物 +50% 经验（vanilla + Kill 掉的）",
@@ -64,7 +64,7 @@ public final class OriginalWeaponRegistry {
             Items.SOUL_SAND, Items.NETHERITE_SWORD);
 
         reg("abyssal_trident", "深渊三叉戟", Items.TRIDENT,
-            12.0, -2.9, "§b",
+            12.0, 1.1, "§b",
             List.of("§8「深海之力借你三秒。」",
                 "§7攻击 §b12 §8· 攻速 §b1.1",
                 "§7水下攻击 +50%",
@@ -73,10 +73,9 @@ public final class OriginalWeaponRegistry {
             Items.PRISMARINE_CRYSTALS, Items.TRIDENT);
 
         reg("void_blade", "虚空之刃", Items.NETHERITE_SWORD,
-            15.0, -2.2, "§5",
+            15.0, 1.8, "§5",
             List.of("§8「一刀两个宇宙。」",
                 "§7攻击 §515 §8· 攻速 §51.8",
-                "§7攻击后自动前进 §d3 §7格（穿透方块）",
                 "§5传奇 · 末影水晶 × 8 + 下界合金剑"),
             Items.END_CRYSTAL, Items.NETHERITE_SWORD);
     }
