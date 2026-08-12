@@ -47,7 +47,8 @@ public final class EntityCap {
         SpawnReason.STRUCTURE,
         SpawnReason.PATROL,
         SpawnReason.JOCKEY,
-        SpawnReason.EVENT
+        SpawnReason.EVENT,
+        SpawnReason.REINFORCEMENT  // 僵尸增援计入实体总数
     );
 
     /** 当前生效的上限，由 Sidebar.refresh() 每秒更新。*/
