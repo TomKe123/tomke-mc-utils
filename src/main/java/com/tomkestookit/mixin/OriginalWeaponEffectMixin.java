@@ -63,7 +63,7 @@ public abstract class OriginalWeaponEffectMixin {
                 break;
 
             case "void_blade":
-                java.util.Random rng = attacker.getRandom();
+                net.minecraft.util.math.random.Random rng = attacker.getRandom();
 
                 // 虚空裂隙：20% 几率 —— 减速II + 凋零II 持续 2 秒（40 tick）
                 if (rng.nextFloat() < 0.20f) {
