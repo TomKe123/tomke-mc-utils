@@ -1,0 +1,1 @@
+give @a minecraft:water_bucket{display:{Name:'{"text":"无限水桶","color":"aqua","italic":false}',Lore:['{"text":"永不耗尽的水源","color":"gray","italic":false}']},Enchantments:[{id:"minecraft:mending",lvl:1}],HideFlags:1,TomkesTookitInfiniteBucket:1b}

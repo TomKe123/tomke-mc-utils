@@ -62,6 +62,7 @@ public final class AdminFeature {
         add("recipe.saturation_potion",  "面包精华",         Items.BREAD,         Group.RECIPE, "9 面包 → 永久饱和喷溅药水");
         add("recipe.region_clearer",     "区域清除斧配方",   Items.IRON_PICKAXE,  Group.RECIPE, "中心铁镐 + 8 材质 → 对应 tier 清除斧");
         add("recipe.region_filler",      "附魔水/岩浆桶配方",Items.WATER_BUCKET,  Group.RECIPE, "9 水桶 / 9 岩浆桶 → 附魔桶");
+        add("recipe.infinite_bucket",    "无限水/岩浆桶配方",Items.LAVA_BUCKET,   Group.RECIPE, "V字形：水/岩浆桶 + 炼药锅 + 3 铁块 → 无限桶");
         add("recipe.logistics",          "物流终端配方",     Items.LODESTONE,     Group.RECIPE, "8 铁块 + 中心磁石 → 一对物流桶");
         add("recipe.auto_crafter",       "自动合成器配方",   Items.CRAFTING_TABLE,Group.RECIPE, "中心工作台 + 4 铁 + 4 红石 → 自动合成器");
         add("recipe.trinket",            "饰品配方",         Items.ENDER_EYE,    Group.RECIPE, "8 种饰品的 3×3 合成");
@@ -102,6 +103,7 @@ public final class AdminFeature {
         add("world.sleep_percentage",    "1 人睡觉跳夜",     Items.RED_BED,       Group.WORLD, "启服写 gamerule；关掉后需要 /gamerule 手动改回");
         add("world.spawn_protection",    "传送/重生无敌",    Items.SHIELD,        Group.WORLD, "5 秒 RESISTANCE IV + 防火");
         add("world.per_player_spawn",   "每玩家刷怪配额",   Items.ZOMBIE_HEAD,   Group.WORLD, "自然刷怪 cap 按最近玩家独立计算");
+        add("world.entity_cap",         "128 格实体上限",   Items.BARRIER,       Group.WORLD, "每玩家 128 格内被动生成实体不超过 200，超过则拒绝自然刷怪。玩家主动行为（繁殖/生成蛋/命令等）不受限");
         add("world.item_cleanup_timer", "定时清理掉落物",   Items.CLOCK,         Group.WORLD, "每 30 分钟清理当前维度掉落物，提前 1 分钟 bossbar 提醒");
         add("world.item_cleanup_lag",   "卡顿清理掉落物",   Items.HOPPER,        Group.WORLD, "当前维度掉落物过多且 MSPT 偏高时，提前 10 秒 bossbar 提醒后清理");
         add("world.armor_stand_durable","盔甲架耐久增强",   Items.ARMOR_STAND,   Group.WORLD, "盔甲架需要连续攻击 5 次才会破坏，横扫只算 1 次");

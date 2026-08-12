@@ -45,3 +45,6 @@ src/main/resources/assets/tomkestookit/resourcepack.zip
 # Misc
 openspec/
 server.properties.resource-pack.txt
+server.log
+server.pid
+server_cmd.txt

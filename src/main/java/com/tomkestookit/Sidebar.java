@@ -66,22 +66,53 @@ public final class Sidebar {
 
         double mspt = averageMspt(server);
         double tps = Math.min(20.0, 1000.0 / Math.max(mspt, 1e-6));
-        String tpsLine = "§7TPS §f" + colorTps(tps) + String.format("%.1f", tps);
+
+        // 更新 EntityCap 动态上限（每秒一次，与 sidebar 刷新同频）
+        if (com.tomkestookit.TomkesTookitConfig.enabled("world.entity_cap")) {
+            com.tomkestookit.entitycap.EntityCap.updateCap(mspt);
+        }
+
+        String tpsLine  = "§7TPS §f"  + colorTps(tps)   + String.format("%.1f", tps);
         String msptLine = "§7MSPT §f" + colorMspt(mspt) + String.format("%.1f ms", mspt);
         String timeLine = "§7时间 §f" + formatMcTime(server);
 
-        java.util.Set<String> wanted = java.util.Set.of(tpsLine, timeLine, msptLine);
+        // 实体上限行（仅单人或取第一个玩家，多人显示第一个真人玩家）
+        String capLine = null;
+        if (com.tomkestookit.TomkesTookitConfig.enabled("world.entity_cap")) {
+            int cap = com.tomkestookit.entitycap.EntityCap.getCurrentCap();
+            // 找主世界第一个真人玩家来统计实体数
+            net.minecraft.server.network.ServerPlayerEntity sample = null;
+            for (net.minecraft.server.network.ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+                if (!p.isSpectator() && !com.tomkestookit.CarpetBotUtil.isFakePlayer(p)) {
+                    sample = p;
+                    break;
+                }
+            }
+            if (sample != null && sample.getServerWorld() != null) {
+                int count = com.tomkestookit.entitycap.EntityCap.countForPlayer(
+                    sample.getServerWorld(), sample);
+                String countColor = count >= cap ? "§c"
+                    : count >= cap * 0.8 ? "§e"
+                    : "§a";
+                capLine = "§7实体 " + countColor + count + "§7/" + cap;
+            }
+        }
 
-        // 清掉不在新集合的旧行（rename 会残留旧的 fake player）
+        java.util.Set<String> wanted = capLine != null
+            ? java.util.Set.of(tpsLine, timeLine, msptLine, capLine)
+            : java.util.Set.of(tpsLine, timeLine, msptLine);
+
+        // 清掉不在新集合的旧行
         for (ScoreboardPlayerScore old : new java.util.ArrayList<>(board.getAllPlayerScores(objective))) {
             if (!wanted.contains(old.getPlayerName())) {
                 board.resetPlayerScore(old.getPlayerName(), objective);
             }
         }
 
-        board.getPlayerScore(tpsLine, objective).setScore(3);
-        board.getPlayerScore(timeLine, objective).setScore(2);
-        board.getPlayerScore(msptLine, objective).setScore(1);
+        board.getPlayerScore(tpsLine,  objective).setScore(4);
+        board.getPlayerScore(timeLine, objective).setScore(3);
+        board.getPlayerScore(msptLine, objective).setScore(2);
+        if (capLine != null) board.getPlayerScore(capLine, objective).setScore(1);
     }
 
     // ------------------------------------------------------------------ metrics
