@@ -86,6 +86,7 @@ public class TomkesTookitMod implements ModInitializer {
         // com.tomkestookit.elite.CombatFrenzyTracker.register();
         // com.tomkestookit.elite.EliteDebuffAura.register();
         // com.tomkestookit.elite.skill.EliteSkillExecutor.register();
+        // Boss 系统也一并取消
         // com.tomkestookit.boss.BossSummonHandler.register();
         // com.tomkestookit.boss.BossBarManager.register();
         // 素材掉落改由独立事件注册（原来由 EliteMobDropMixin 触发）

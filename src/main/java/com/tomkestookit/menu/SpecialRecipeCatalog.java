@@ -62,14 +62,15 @@ public final class SpecialRecipeCatalog {
         java.util.Map.entry("weapon_blood_moon_scythe",   "item.original_weapon"),
         java.util.Map.entry("weapon_soul_reaper",         "item.original_weapon"),
         java.util.Map.entry("weapon_abyssal_trident",     "item.original_weapon"),
-        java.util.Map.entry("weapon_void_blade",          "item.original_weapon"),
-        java.util.Map.entry("boss_infernal_warden",       "item.boss_token"),
-        java.util.Map.entry("boss_abyssal_guardian",      "item.boss_token"),
-        java.util.Map.entry("boss_frost_lich",            "item.boss_token"),
-        java.util.Map.entry("boss_void_dragon_child",     "item.boss_token")
+        java.util.Map.entry("weapon_void_blade",          "item.original_weapon")
+        // Boss 系统已取消
+        // java.util.Map.entry("boss_infernal_warden",       "item.boss_token"),
+        // java.util.Map.entry("boss_abyssal_guardian",      "item.boss_token"),
+        // java.util.Map.entry("boss_frost_lich",            "item.boss_token"),
+        // java.util.Map.entry("boss_void_dragon_child",     "item.boss_token")
     );
 
-    public enum Category { CRAFTING, TRINKET, REFORGE, WEAPON, BOSS }
+    public enum Category { CRAFTING, TRINKET, REFORGE, WEAPON }
 
     /** 展示给菜单的配方目录；管理员关掉的自动过滤。*/
     public static List<SpecialRecipeEntry> all() {
@@ -104,7 +105,8 @@ public final class SpecialRecipeCatalog {
         if (e.key().startsWith("trinket_")) return Category.TRINKET;
         if (e.key().startsWith("reforge_")) return Category.REFORGE;
         if (e.key().startsWith("weapon_")) return Category.WEAPON;
-        if (e.key().startsWith("boss_")) return Category.BOSS;
+        // Boss 系统已取消
+        // if (e.key().startsWith("boss_")) return Category.BOSS;
         return Category.CRAFTING;
     }
 
@@ -306,7 +308,8 @@ public final class SpecialRecipeCatalog {
         }
 
         // ---- Boss 令牌 ----
-        // 材料改用 vanilla 物品，不再用 MobMaterial NBT ItemStack
+        // Boss 系统已取消
+        /*
         for (com.tomkestookit.boss.BossTokenRegistry.BossDef bdef :
                 com.tomkestookit.boss.BossTokenRegistry.ALL) {
             List<String> bossLore = new ArrayList<>();
@@ -329,6 +332,7 @@ public final class SpecialRecipeCatalog {
                 bossLore
             ));
         }
+        */
 
         // ---- 原创武器 ----
         // 合成中心现在是 vanilla 物品，不需要 buildMobMatStack
