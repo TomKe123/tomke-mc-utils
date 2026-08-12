@@ -123,7 +123,8 @@ public final class BossTokenRegistry {
         // Boss 令牌统一为传奇品质
         com.tomkestookit.materials.ItemQualityTag.append(stack,
             com.tomkestookit.materials.ItemQualityTag.Quality.LEGENDARY,
-            "3×3 合成 §8· §7需精英怪掉落的怪物素材");
+            "3×3 合成 §8· §7" + def.craftingCenter().getName().getString() + " (中心) + "
+                + def.craftingSurround().getName().getString() + " ×8");
 
         return stack;
     }

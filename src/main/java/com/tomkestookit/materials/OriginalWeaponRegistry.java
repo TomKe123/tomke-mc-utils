@@ -52,7 +52,7 @@ public final class OriginalWeaponRegistry {
             List.of("§8「月光染红时，收割不止麦子。」",
                 "§7攻击 §c8 §8· 攻速 §c1.5",
                 "§7命中回血 15% 造成的伤害（不吸魔法/环境）",
-                "§c稀有 · 血月精华锻造"),
+                "§c稀有 · 红石 × 8 + 铁锄"),
             Items.REDSTONE, Items.IRON_HOE);
 
         reg("soul_reaper", "灵魂收割者", Items.NETHERITE_SWORD,
@@ -60,7 +60,7 @@ public final class OriginalWeaponRegistry {
             List.of("§8「灵魂收进刀里，你还想去哪？」",
                 "§7攻击 §510 §8· 攻速 §51.6",
                 "§7击杀怪物 +50% 经验（vanilla + Kill 掉的）",
-                "§5史诗 · 灵魂结晶淬炼"),
+                "§5史诗 · 灵魂沙 × 8 + 下界合金剑"),
             Items.SOUL_SAND, Items.NETHERITE_SWORD);
 
         reg("abyssal_trident", "深渊三叉戟", Items.TRIDENT,
@@ -69,7 +69,7 @@ public final class OriginalWeaponRegistry {
                 "§7攻击 §b12 §8· 攻速 §b1.1",
                 "§7水下攻击 +50%",
                 "§7攻击附带穿透（无视 30% 护甲）",
-                "§b稀有 · 深邃碎片强化"),
+                "§b稀有 · 海晶砂粒 × 8 + 三叉戟"),
             Items.PRISMARINE_CRYSTALS, Items.TRIDENT);
 
         reg("void_blade", "虚空之刃", Items.NETHERITE_SWORD,
@@ -77,7 +77,7 @@ public final class OriginalWeaponRegistry {
             List.of("§8「一刀两个宇宙。」",
                 "§7攻击 §515 §8· 攻速 §51.8",
                 "§7攻击后自动前进 §d3 §7格（穿透方块）",
-                "§5传奇 · 虚空之核 + 星尘凝聚"),
+                "§5传奇 · 末影水晶 × 8 + 下界合金剑"),
             Items.END_CRYSTAL, Items.NETHERITE_SWORD);
     }
 
@@ -163,7 +163,8 @@ public final class OriginalWeaponRegistry {
             case "soul_reaper" -> ItemQualityTag.Quality.EPIC;
             default -> ItemQualityTag.Quality.RARE;
         };
-        ItemQualityTag.append(stack, q, "3×3 合成 §8· §7中心需怪物专属素材");
+        ItemQualityTag.append(stack, q, "3×3 合成 §8· §7" + def.centerItem().getName().getString()
+            + " (中心) + " + def.surroundItem().getName().getString() + " ×8");
 
         return stack;
     }
