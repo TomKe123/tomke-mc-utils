@@ -76,6 +76,7 @@ public class TomkesTookitMod implements ModInitializer {
         com.tomkestookit.menu.TrashCanMenu.register();
         PerPlayerSpawnCap.register();
         SugarTntHandler.register();
+        ThrownExplosiveHandler.register();
         AfkDisplay.register();
         PortableCommand.register();
         PlayerTeleport.register();

@@ -22,16 +22,20 @@ public final class RegionFillerRecipe {
 
     public static RegionFiller.FillerType match3x3(RecipeInputInventory inv) {
         if (inv.getWidth() != 3 || inv.getHeight() != 3) return null;
-        // 首格决定类型
+        // 首格决定类型（必须是 vanilla 桶，不能是无限桶或附魔桶）
         ItemStack first = inv.getStack(0);
+        if (com.tomkestookit.infinitebucket.InfiniteBucket.isInfinite(first)) return null;
+        if (RegionFiller.isTool(first)) return null;
         RegionFiller.FillerType type;
         if (first.isOf(Items.WATER_BUCKET)) type = RegionFiller.FillerType.WATER;
         else if (first.isOf(Items.LAVA_BUCKET)) type = RegionFiller.FillerType.LAVA;
         else return null;
-        // 其余 8 格必须与首格一致
+        // 其余 8 格必须与首格一致（同样必须是 vanilla 桶）
         for (int i = 1; i < 9; i++) {
             ItemStack s = inv.getStack(i);
             if (!s.isOf(type.baseItem)) return null;
+            if (com.tomkestookit.infinitebucket.InfiniteBucket.isInfinite(s)) return null;
+            if (RegionFiller.isTool(s)) return null;
         }
         return type;
     }

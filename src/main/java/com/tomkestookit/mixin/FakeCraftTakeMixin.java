@@ -34,7 +34,7 @@ public abstract class FakeCraftTakeMixin {
     private void tomkestookit$consumeInputsForFakeCraft(PlayerEntity player, ItemStack stack, CallbackInfo ci) {
         if (!FakeCraftMarker.isMarked(stack)) return;
         FakeCraftMarker.clear(stack);
-        // 关键：用 removeStack 扣输入，走 CraftingInventory 的 setStack/removeStack →
+        // 关键：用 setStack/removeStack 走 CraftingInventory 的写入 →
         // 触发 handler.onContentChanged → updateResult 重跑 → CraftingResultMixin TAIL
         // 会检查新输入，够料就塞新 fake result，shift-craft 循环得以继续。
         //
@@ -42,7 +42,21 @@ public abstract class FakeCraftTakeMixin {
         // 不感知内容变了（其 markDirty() 是空的），结果槽保持我们上次塞的空壳 stack →
         // vanilla shift 循环外层 areItemsEqual 失败退出 → 一次只能合成 1 个。
         for (int i = 0; i < input.size(); i++) {
-            if (!input.getStack(i).isEmpty()) {
+            ItemStack s = input.getStack(i);
+            if (s.isEmpty()) continue;
+
+            // 特殊保留：无限桶 / 附魔桶 完全不消耗（NBT 太贵，不能吞）
+            if (com.tomkestookit.ThrownExplosiveHandler.shouldPreserveInput(s)) {
+                // 触发一次 dirty 让结果槽重算（否则 shift-craft 循环卡住）
+                input.setStack(i, s.copy());
+                continue;
+            }
+
+            // count == 1 且有 recipe remainder（如水桶 → 空桶）：把 remainder 放回槽位
+            if (s.getCount() == 1 && s.getItem().hasRecipeRemainder()) {
+                input.setStack(i,
+                    new net.minecraft.item.ItemStack(s.getItem().getRecipeRemainder()));
+            } else {
                 input.removeStack(i, 1);
             }
         }

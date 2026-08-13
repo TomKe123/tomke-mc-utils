@@ -59,6 +59,7 @@ public final class AdminFeature {
         // ---------- 配方 ----------
         add("recipe.greed_potion",       "贪婪之瓶",         Items.EMERALD_BLOCK, Group.RECIPE, "8 绿宝石块 + 1 空瓶 → 100 分钟 BAD_OMEN");
         add("recipe.sugar_tnt",          "大伊万",           Items.TNT,           Group.RECIPE, "8 糖 + 中心 TNT → 4× 威力附魔 TNT");
+        add("recipe.thrown_explosive",   "手雷 / 蹦蹦炸弹",  Items.FIRE_CHARGE,   Group.RECIPE, "TNT/大伊万 + 水桶 → 手雷/蹦蹦炸弹（无限桶/附魔桶不消耗）");
         add("recipe.saturation_potion",  "面包精华",         Items.BREAD,         Group.RECIPE, "9 面包 → 永久饱和喷溅药水");
         add("recipe.region_clearer",     "区域清除斧配方",   Items.IRON_PICKAXE,  Group.RECIPE, "中心铁镐 + 8 材质 → 对应 tier 清除斧");
         add("recipe.region_filler",      "附魔水/岩浆桶配方",Items.WATER_BUCKET,  Group.RECIPE, "9 水桶 / 9 岩浆桶 → 附魔桶");
@@ -70,6 +71,7 @@ public final class AdminFeature {
         // ---------- 物品交互 ----------
         add("item.antigrav_boots",       "反重力靴",         Items.LEATHER_BOOTS, Group.ITEM, "跳跃 II、摔落减伤 75%、速度 ×3、铁砧转移");
         add("item.sugar_tnt_boom",       "大伊万爆炸增强",   Items.TNT,           Group.ITEM, "关闭后已合成的大伊万走 vanilla 威力");
+        add("item.thrown_explosive",     "手雷 / 蹦蹦炸弹",  Items.FIRE_CHARGE,   Group.ITEM, "右键抛出，爆炸只造成伤害不破坏方块");
         add("item.region_clearer_use",   "区域清除斧使用",   Items.NETHERITE_AXE, Group.ITEM, "左右键选点、聊天确认后分批清除");
         add("item.region_filler_use",    "附魔桶使用",       Items.LAVA_BUCKET,   Group.ITEM, "9 格附魔桶一次性填空气");
         add("item.logistics_ops",        "物流终端运行",     Items.BARREL,        Group.ITEM, "同步库存、状态标签、破坏保护");

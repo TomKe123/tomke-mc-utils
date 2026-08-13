@@ -29,6 +29,8 @@
     "PassiveEntityAgeRestoreMixin",
     "AfkPhantomImmuneMixin",
     "SugarTntPowerMixin",
+    "ThrownExplosivePowerMixin",
+    "ThrownExplosiveBounceMixin",
     "RegionClearerAnvilMixin",
     "RegionClearerCraftingMixin",
     "RegionClearerEnchantmentMixin",

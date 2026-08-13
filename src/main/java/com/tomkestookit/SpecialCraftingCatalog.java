@@ -31,6 +31,14 @@ public final class SpecialCraftingCatalog {
     public static ItemStack tryMatch(RecipeInputInventory input) {
         if (TomkesTookitConfig.enabled("recipe.greed_potion")
             && GreedPotion.matches3x3(input)) return GreedPotion.buildResult();
+        // 投掷炸弹：手雷 / 蹦蹦炸弹（必须在 SugarTnt 之前，否则 8糖+中心大伊万也会误匹配大伊万）
+        // 我们的匹配要求恰好 2 格非空，而 SugarTnt 要求 9 格全满，天然不会冲突；
+        // 但保险起见放在 SugarTnt 之前
+        if (TomkesTookitConfig.enabled("recipe.thrown_explosive")) {
+            com.tomkestookit.recipe.ThrownExplosive.Type te =
+                com.tomkestookit.recipe.ThrownExplosive.match3x3(input);
+            if (te != null) return com.tomkestookit.recipe.ThrownExplosive.buildResult(te);
+        }
         if (TomkesTookitConfig.enabled("recipe.sugar_tnt")
             && SugarTnt.matches3x3(input)) return SugarTnt.buildResult();
         if (TomkesTookitConfig.enabled("recipe.saturation_potion")

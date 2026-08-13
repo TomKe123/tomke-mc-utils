@@ -27,6 +27,8 @@ public final class SpecialRecipeCatalog {
     private static final java.util.Map<String, String> KEY_TO_CONFIG = java.util.Map.ofEntries(
         java.util.Map.entry("greed_potion",         "recipe.greed_potion"),
         java.util.Map.entry("sugar_tnt",            "recipe.sugar_tnt"),
+        java.util.Map.entry("grenade",              "recipe.thrown_explosive"),
+        java.util.Map.entry("bouncy_bomb",          "recipe.thrown_explosive"),
         java.util.Map.entry("saturation_potion",    "recipe.saturation_potion"),
         java.util.Map.entry("infinite_bucket_water","recipe.infinite_bucket"),
         java.util.Map.entry("infinite_bucket_lava", "recipe.infinite_bucket"),
@@ -146,6 +148,44 @@ public final class SpecialRecipeCatalog {
                 "§c威力 §f×4 §8半径 §f×4 §8伤害 §f×4",
                 "§e右键 §7放地上引信 §8· §eshift + 右键 §7抛出去",
                 "§8扔完之后建议看看背包还剩几颗牙"
+            )
+        ));
+
+        // 手雷
+        list.add(new SpecialRecipeEntry(
+            "grenade",
+            () -> com.tomkestookit.recipe.ThrownExplosive.buildResult(
+                com.tomkestookit.recipe.ThrownExplosive.Type.GRENADE),
+            new Item[] {
+                Items.TNT,          null, null,
+                Items.WATER_BUCKET, null, null,
+                null,               null, null
+            },
+            List.of(
+                "§8「拉环、五秒、扔出去。」",
+                "§71 TNT + 1 水桶 §8（任意 2 格）",
+                "§e右键 §7手持抛出",
+                "§c爆炸只造成伤害，不破坏方块",
+                "§8无限桶 / 附魔桶 §7不消耗"
+            )
+        ));
+
+        // 蹦蹦炸弹
+        list.add(new SpecialRecipeEntry(
+            "bouncy_bomb",
+            () -> com.tomkestookit.recipe.ThrownExplosive.buildResult(
+                com.tomkestookit.recipe.ThrownExplosive.Type.BOUNCY_BOMB),
+            new Item[] {
+                Items.TNT,          null, null,
+                Items.WATER_BUCKET, null, null,
+                null,               null, null
+            },
+            List.of(
+                "§8「弹一弹、再弹一弹，砰。」",
+                "§71 大伊万 + 1 水桶 §8（任意 2 格）",
+                "§e右键 §7手持抛出，落地 §d弹跳",
+                "§c爆炸只造成伤害，不破坏方块",
+                "§8无限桶 / 附魔桶 §7不消耗"
             )
         ));
 

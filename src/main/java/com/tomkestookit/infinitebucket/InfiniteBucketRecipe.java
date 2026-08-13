@@ -23,8 +23,10 @@ public final class InfiniteBucketRecipe {
     public static InfiniteBucket.BucketType match3x3(RecipeInputInventory input) {
         if (input.getWidth() != 3 || input.getHeight() != 3) return null;
 
-        // 顶部中间：水桶或岩浆桶
+        // 顶部中间：水桶或岩浆桶（vanilla 版本，不能是无限桶或附魔桶）
         ItemStack bucketSlot = input.getStack(1);
+        if (InfiniteBucket.isInfinite(bucketSlot)) return null;
+        if (com.tomkestookit.regionfiller.RegionFiller.isTool(bucketSlot)) return null;
         InfiniteBucket.BucketType type;
         if (bucketSlot.getItem() == Items.WATER_BUCKET) {
             type = InfiniteBucket.BucketType.WATER;
