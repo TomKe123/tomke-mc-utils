@@ -42,7 +42,19 @@ public abstract class AnvilReforgeMixin {
         ItemStack left = self.getSlot(0).getStack();
         ItemStack right = self.getSlot(1).getStack();
 
-        if (left.isEmpty() || right.isEmpty()) return;
+        boolean leftIsSpecial = !left.isEmpty() && OriginalWeaponRegistry.getId(left) != null;
+
+        if (left.isEmpty() || right.isEmpty()) {
+            // 特殊武器单独放入铁砧改名 → 无右侧物品时也强制保留原名
+            if (leftIsSpecial) {
+                ItemStack out = self.getSlot(2).getStack();
+                if (!out.isEmpty() && OriginalWeaponRegistry.getId(out) != null) {
+                    restoreFormattedName(out, left);
+                    self.getSlot(2).setStack(out); // 触发同步
+                }
+            }
+            return;
+        }
 
         // ---- 路径 1：左装备 + 右重铸石 → 追加属性 ----
         String reforgeId = ReforgeRegistry.getId(right);
@@ -51,26 +63,20 @@ public abstract class AnvilReforgeMixin {
             if (def != null && def.canApply().test(left) && !ReforgeRegistry.alreadyApplied(left, def)) {
                 ItemStack result = ReforgeRegistry.applyReforge(left, def);
 
-                // 特殊武器：强制恢复原始格式化名称（禁止改名）
-                if (OriginalWeaponRegistry.getId(left) != null) {
-                    restoreFormattedName(result, left);
-                }
+                if (leftIsSpecial) restoreFormattedName(result, left);
 
                 self.getSlot(2).setStack(result);
                 this.levelCost.set(def.anvilCost());
-                self.sendContentUpdates();
                 return;
             }
         }
 
         // ---- 路径 2：左装备A + 右装备B（B有重铸） → 把B的适配重铸合并到A ----
-        // 注意：左侧装备不要求已有重铸，只要右侧有 APPLIED_TAG 即可触发
         NbtCompound rightNbt = right.getNbt();
         if (rightNbt != null && rightNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
 
             NbtList rightApplied = rightNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
 
-            // 收集左侧装备已有的重铸 id（可能为空）
             java.util.Set<String> leftIds = new java.util.HashSet<>();
             NbtCompound leftNbt = left.getNbt();
             if (leftNbt != null && leftNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
@@ -80,7 +86,6 @@ public abstract class AnvilReforgeMixin {
                 }
             }
 
-            // 找出 B 有但 A 没有的重铸石，且必须适配 A
             java.util.List<ReforgeRegistry.ReforgeDef> toMerge = new java.util.ArrayList<>();
             for (int i = 0; i < rightApplied.size(); i++) {
                 String rightId = rightApplied.getString(i);
@@ -100,14 +105,21 @@ public abstract class AnvilReforgeMixin {
                     totalCost += def.anvilCost();
                 }
 
-                // 特殊武器：强制恢复原始格式化名称（禁止改名）
-                if (OriginalWeaponRegistry.getId(left) != null) {
-                    restoreFormattedName(result, left);
-                }
+                if (leftIsSpecial) restoreFormattedName(result, left);
 
                 self.getSlot(2).setStack(result);
-                this.levelCost.set(Math.min(totalCost, 39)); // 上限 39 级
-                self.sendContentUpdates();
+                this.levelCost.set(Math.min(totalCost, 39));
+                return;
+            }
+        }
+
+        // ---- 兜底：左侧是特殊武器但没走上面任何一条路径，仍然强制恢复输出的名称 ----
+        // 例如 vanilla 生成了合并结果（同类型装备耐久合并），我们只改名不改结果
+        if (leftIsSpecial) {
+            ItemStack out = self.getSlot(2).getStack();
+            if (!out.isEmpty() && OriginalWeaponRegistry.getId(out) != null) {
+                restoreFormattedName(out, left);
+                self.getSlot(2).setStack(out);
             }
         }
     }
