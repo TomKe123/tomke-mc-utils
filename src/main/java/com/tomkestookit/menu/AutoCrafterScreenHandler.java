@@ -203,7 +203,8 @@ public final class AutoCrafterScreenHandler extends ScreenHandler {
 
     private ItemStack modeStack(boolean flash) {
         String mode = config.triggerMode == null ? "powered" : config.triggerMode;
-        Item item = flash ? Items.LIME_STAINED_GLASS_PANE : switch (mode) {
+        // 修复：合成闪光时不改变模式按钮图标（保持原模式图标）
+        Item item = switch (mode) {
             case "always" -> Items.CLOCK;
             case "pulse" -> Items.REPEATER;
             default -> Items.REDSTONE_TORCH;

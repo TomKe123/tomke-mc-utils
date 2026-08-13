@@ -76,6 +76,13 @@ public final class Sidebar {
         String msptLine = "§7MSPT §f" + colorMspt(mspt) + String.format("%.1f ms", mspt);
         String timeLine = "§7时间 §f" + formatMcTime(server);
 
+        // 全服总实体数行（统计所有维度）
+        int totalEntities = 0;
+        for (net.minecraft.server.world.ServerWorld world : server.getWorlds()) {
+            totalEntities += world.iterateEntities().spliterator().getExactSizeIfKnown();
+        }
+        String totalLine = "§7总实体 §f" + colorEntityCount(totalEntities) + totalEntities;
+
         // 实体上限行（仅单人或取第一个玩家，多人显示第一个真人玩家）
         String capLine = null;
         if (com.tomkestookit.TomkesTookitConfig.enabled("world.entity_cap")) {
@@ -94,13 +101,13 @@ public final class Sidebar {
                 String countColor = count >= cap ? "§c"
                     : count >= cap * 0.8 ? "§e"
                     : "§a";
-                capLine = "§7实体 " + countColor + count + "§7/" + cap;
+                capLine = "§7范围实体 " + countColor + count + "§7/" + cap;
             }
         }
 
         java.util.Set<String> wanted = capLine != null
-            ? java.util.Set.of(tpsLine, timeLine, msptLine, capLine)
-            : java.util.Set.of(tpsLine, timeLine, msptLine);
+            ? java.util.Set.of(tpsLine, timeLine, msptLine, totalLine, capLine)
+            : java.util.Set.of(tpsLine, timeLine, msptLine, totalLine);
 
         // 清掉不在新集合的旧行
         for (ScoreboardPlayerScore old : new java.util.ArrayList<>(board.getAllPlayerScores(objective))) {
@@ -109,10 +116,17 @@ public final class Sidebar {
             }
         }
 
-        board.getPlayerScore(tpsLine,  objective).setScore(4);
-        board.getPlayerScore(timeLine, objective).setScore(3);
-        board.getPlayerScore(msptLine, objective).setScore(2);
+        board.getPlayerScore(tpsLine,  objective).setScore(5);
+        board.getPlayerScore(timeLine, objective).setScore(4);
+        board.getPlayerScore(msptLine, objective).setScore(3);
+        board.getPlayerScore(totalLine, objective).setScore(2);
         if (capLine != null) board.getPlayerScore(capLine, objective).setScore(1);
+    }
+
+    private static String colorEntityCount(int count) {
+        if (count <= 3000) return "" + Formatting.GREEN;
+        if (count <= 5000) return "" + Formatting.YELLOW;
+        return "" + Formatting.RED;
     }
 
     // ------------------------------------------------------------------ metrics

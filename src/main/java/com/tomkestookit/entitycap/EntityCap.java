@@ -116,7 +116,7 @@ public final class EntityCap {
         double bestSq = RADIUS_SQ;
         for (ServerPlayerEntity p : world.getPlayers()) {
             if (p.isSpectator()) continue;
-            if (com.tomkestookit.CarpetBotUtil.isFakePlayer(p)) continue;
+            // 假人也计入实体上限检测范围（不再排除假人）
             double dx = p.getX() - x, dy = p.getY() - y, dz = p.getZ() - z;
             double sq = dx * dx + dy * dy + dz * dz;
             if (sq <= bestSq) { bestSq = sq; best = p; }
