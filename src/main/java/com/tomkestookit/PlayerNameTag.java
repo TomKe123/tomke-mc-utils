@@ -19,20 +19,21 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 玩家头顶名字附加实时血量 + 等级 —— 分两行显示。
+ * 玩家头顶名字附加实时血量 + 等级 + 身份标签 —— 分两行显示。
  *
  * 布局：
- *   第一行：{@code 玩家名 §c<HP>❤}   ← 通过 team suffix 挂在玩家名后
- *   第二行：{@code <LV> §6Lv}       ← 通过 belowName scoreboard 显示等级
+ *   第一行：{@code [玩家]/[假人] 玩家名 §c<HP>❤}   ← team prefix + name + suffix
+ *   第二行：{@code <LV> §6Lv}                    ← belowName scoreboard 显示等级
  *
  * 实现细节：
+ *   - 身份 走 team prefix（[假人] 红加粗 / [玩家] 绿加粗）
  *   - HP 走 team suffix，每 20 tick 手动刷新（vanilla 无 HP=整数 auto-sync 到 suffix）
  *   - Level 走 vanilla {@code LEVEL} criterion + BELOW_NAME_DISPLAY_SLOT_ID，自动同步
  *   - 玩家 team 名 {@code tt_hp_<uuid前10位>}，vanilla team 名长度 ≤16 限制
  *
  * 兼容性：
- *   - 只改 team suffix + 一个 belowName objective，不改 DisplayName / CustomName
- *   - 与 CarpetBotTabNameMixin（只影响 tab 列表）不冲突
+ *   - 只改 team prefix/suffix + 一个 belowName objective，不改 DisplayName / CustomName
+ *   - 与 CarpetBotTabNameMixin（只影响 tab 列表）不冲突（那里前缀走 getPlayerListName）
  *   - 与 TabHealth（LIST 槽 hearts 渲染）不冲突（不同 slot）
  */
 public final class PlayerNameTag {
@@ -124,6 +125,13 @@ public final class PlayerNameTag {
             board.addPlayerToTeam(p.getName().getString(), team);
             INITIALIZED.add(p.getUuid());
         }
+
+        // 身份前缀：[假人] / [玩家]（每 tick 重设是幂等的，写入 team 内部字段无副作用）
+        boolean isBot = com.tomkestookit.CarpetBotUtil.isFakePlayer(p);
+        Text prefix = isBot
+            ? Text.literal("[假人] ").formatted(Formatting.RED, Formatting.BOLD)
+            : Text.literal("[玩家] ").formatted(Formatting.GREEN, Formatting.BOLD);
+        team.setPrefix(prefix);
 
         int hp = (int) Math.ceil(p.getHealth());
         int maxHp = (int) Math.ceil(p.getMaxHealth());
