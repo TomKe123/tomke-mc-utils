@@ -63,22 +63,24 @@ public abstract class AnvilReforgeMixin {
             }
         }
 
-        // ---- 路径 2：左装备A + 右装备B（两者都有重铸） → 合并重铸到A ----
-        NbtCompound leftNbt = left.getNbt();
+        // ---- 路径 2：左装备A + 右装备B（B有重铸） → 把B的适配重铸合并到A ----
+        // 注意：左侧装备不要求已有重铸，只要右侧有 APPLIED_TAG 即可触发
         NbtCompound rightNbt = right.getNbt();
-        if (leftNbt != null && rightNbt != null
-            && leftNbt.contains(ReforgeRegistry.APPLIED_TAG)
-            && rightNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
+        if (rightNbt != null && rightNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
 
-            NbtList leftApplied = leftNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
             NbtList rightApplied = rightNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
 
-            // 找出 B 有但 A 没有的重铸石，且必须适配 A
+            // 收集左侧装备已有的重铸 id（可能为空）
             java.util.Set<String> leftIds = new java.util.HashSet<>();
-            for (int i = 0; i < leftApplied.size(); i++) {
-                leftIds.add(leftApplied.getString(i));
+            NbtCompound leftNbt = left.getNbt();
+            if (leftNbt != null && leftNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
+                NbtList leftApplied = leftNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
+                for (int i = 0; i < leftApplied.size(); i++) {
+                    leftIds.add(leftApplied.getString(i));
+                }
             }
 
+            // 找出 B 有但 A 没有的重铸石，且必须适配 A
             java.util.List<ReforgeRegistry.ReforgeDef> toMerge = new java.util.ArrayList<>();
             for (int i = 0; i < rightApplied.size(); i++) {
                 String rightId = rightApplied.getString(i);
