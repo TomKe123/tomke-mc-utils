@@ -1,8 +1,12 @@
 package com.tomkestookit;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.scoreboard.AbstractTeam;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.scoreboard.ScoreboardCriterion;
+import net.minecraft.scoreboard.ScoreboardObjective;
 import net.minecraft.scoreboard.ServerScoreboard;
 import net.minecraft.scoreboard.Team;
 import net.minecraft.server.MinecraftServer;
@@ -15,26 +19,36 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 玩家头顶名字附加实时血量 + 等级。
+ * 玩家头顶名字附加实时血量 + 等级 —— 分两行显示。
  *
- *   显示格式：{@code 玩家名 §c<HP>❤ §aLv<LV>}
+ * 布局：
+ *   第一行：{@code 玩家名 §c<HP>❤}   ← 通过 team suffix 挂在玩家名后
+ *   第二行：{@code <LV> §6Lv}       ← 通过 belowName scoreboard 显示等级
  *
- * 通过 vanilla scoreboard team 的 prefix/suffix 机制实现（每玩家独占一个 team，
- * suffix 每 20 tick 刷新一次）。这个改法只动 team suffix，不改玩家 CustomName /
- * DisplayName，与假人前缀（{@link com.tomkestookit.mixin.CarpetBotTabNameMixin}）
- * 也不冲突（那个只影响 tab 列表，不影响头顶名）。
+ * 实现细节：
+ *   - HP 走 team suffix，每 20 tick 手动刷新（vanilla 无 HP=整数 auto-sync 到 suffix）
+ *   - Level 走 vanilla {@code LEVEL} criterion + BELOW_NAME_DISPLAY_SLOT_ID，自动同步
+ *   - 玩家 team 名 {@code tt_hp_<uuid前10位>}，vanilla team 名长度 ≤16 限制
+ *
+ * 兼容性：
+ *   - 只改 team suffix + 一个 belowName objective，不改 DisplayName / CustomName
+ *   - 与 CarpetBotTabNameMixin（只影响 tab 列表）不冲突
+ *   - 与 TabHealth（LIST 槽 hearts 渲染）不冲突（不同 slot）
  */
 public final class PlayerNameTag {
 
     private static final int REFRESH_INTERVAL = 20; // 1 秒
-    private static final String TEAM_PREFIX = "tt_hp_"; // 后接玩家 UUID 前 10 位（总长≤16）
+    private static final String TEAM_PREFIX = "tt_hp_"; // 后接玩家 UUID 前 10 位（总长 ≤16）
+    private static final String LEVEL_OBJECTIVE = "tomkestookit_level";
 
     /** 已创建过 team 的玩家 UUID，避免每 tick 重复添加。*/
     private static final Set<UUID> INITIALIZED = new HashSet<>();
+    private static ScoreboardObjective levelObjective;
 
     private PlayerNameTag() {}
 
     public static void register() {
+        ServerLifecycleEvents.SERVER_STARTED.register(PlayerNameTag::installLevelObjective);
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % REFRESH_INTERVAL != 0) return;
             if (!TomkesTookitConfig.enabled("ui.player_nametag")) return;
@@ -47,7 +61,7 @@ public final class PlayerNameTag {
         });
     }
 
-    /** 卸载时清理所有 team。*/
+    /** 卸载时清理所有 team + 移除 belowName objective。*/
     public static void uninstall(MinecraftServer server) {
         if (server == null) return;
         ServerScoreboard board = server.getScoreboard();
@@ -56,8 +70,29 @@ public final class PlayerNameTag {
                 board.removeTeam(t);
             }
         }
+        ScoreboardObjective existing = board.getNullableObjective(LEVEL_OBJECTIVE);
+        if (existing != null) board.removeObjective(existing);
         INITIALIZED.clear();
+        levelObjective = null;
     }
+
+    // ------------------------------------------------------------------ setup
+
+    private static void installLevelObjective(MinecraftServer server) {
+        ServerScoreboard board = server.getScoreboard();
+        ScoreboardObjective existing = board.getNullableObjective(LEVEL_OBJECTIVE);
+        if (existing != null) board.removeObjective(existing);
+
+        levelObjective = board.addObjective(
+            LEVEL_OBJECTIVE,
+            ScoreboardCriterion.LEVEL,           // 内置只读，vanilla 每 tick 同步玩家等级
+            Text.literal("§6Lv"),                 // 显示在等级数字右侧
+            ScoreboardCriterion.RenderType.INTEGER
+        );
+        board.setObjectiveSlot(Scoreboard.BELOW_NAME_DISPLAY_SLOT_ID, levelObjective);
+    }
+
+    // ------------------------------------------------------------------ refresh
 
     private static void refreshAll(MinecraftServer server) {
         ServerScoreboard board = server.getScoreboard();
@@ -68,7 +103,6 @@ public final class PlayerNameTag {
     }
 
     private static String teamName(ServerPlayerEntity p) {
-        // UUID 前 10 个十六进制字符 + 前缀 = 16 字符（vanilla team 名限制）
         String u = p.getUuidAsString().replace("-", "");
         return TEAM_PREFIX + u.substring(0, Math.min(10, u.length()));
     }
@@ -93,7 +127,6 @@ public final class PlayerNameTag {
 
         int hp = (int) Math.ceil(p.getHealth());
         int maxHp = (int) Math.ceil(p.getMaxHealth());
-        int lv = p.experienceLevel;
 
         // 血量颜色随比例变化
         Formatting hpColor = hp >= maxHp * 0.66 ? Formatting.GREEN
@@ -103,9 +136,7 @@ public final class PlayerNameTag {
         Text suffix = Text.empty()
             .append(Text.literal(" ").formatted(Formatting.GRAY))
             .append(Text.literal(String.valueOf(hp)).formatted(hpColor))
-            .append(Text.literal("❤ ").formatted(Formatting.RED))
-            .append(Text.literal("Lv").formatted(Formatting.GRAY))
-            .append(Text.literal(String.valueOf(lv)).formatted(Formatting.GOLD));
+            .append(Text.literal("❤").formatted(Formatting.RED));
 
         team.setSuffix(suffix);
     }
