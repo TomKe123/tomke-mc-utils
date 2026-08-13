@@ -20,7 +20,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
  */
 public final class AutoMenderHandler {
 
-    private static final int INTERVAL_TICKS = 10; // 0.5 秒
+    private static final int INTERVAL_TICKS = 4;              // 0.2 秒
+    private static final int MAX_REPAIRS_PER_TICK = 8;        // 每次 tick 最多修 8 点耐久
 
     private AutoMenderHandler() {}
 
@@ -38,29 +39,31 @@ public final class AutoMenderHandler {
 
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             if (player.isCreative() || player.isSpectator()) continue;
-            // 没有经验就不处理
             if (player.experienceLevel <= 0 && player.experienceProgress <= 0.0f) continue;
 
             int mainHandSlot = player.getInventory().selectedSlot;
             boolean isBreaking = ((InteractionManagerAccessor) player.interactionManager).isMining();
 
+            int repairsLeft = MAX_REPAIRS_PER_TICK;
+
             // 扫描整个物品栏：36 主栏 + 副手(40) + 4 盔甲(36-39)
-            for (int slot = 0; slot < 41; slot++) {
+            outer:
+            for (int slot = 0; slot < 41 && repairsLeft > 0; slot++) {
                 ItemStack stack = player.getInventory().getStack(slot);
                 if (stack.isEmpty()) continue;
                 if (!stack.isDamageable()) continue;
                 if (!stack.isDamaged()) continue;
                 if (!ReforgeRegistry.alreadyApplied(stack, soulMend)) continue;
 
-                // 如果是主手物品且玩家正在挖方块，跳过（避免打断挖掘进度）
+                // 主手物品正在挖方块时跳过，避免打断挖掘
                 if (slot == mainHandSlot && isBreaking) continue;
 
-                // 找到损坏的且有 soul_mend 的物品 → 修 1 点
-                if (tryConsumeXp(player)) {
+                // 一次尽量把这件装备修满，直到没 XP 或达到本 tick 上限
+                while (stack.isDamaged() && repairsLeft > 0) {
+                    if (!tryConsumeXp(player)) break outer;
                     stack.setDamage(stack.getDamage() - 1);
+                    repairsLeft--;
                 }
-                // 每次 tick 只修一个物品的一点耐久（避免经验消耗太猛）
-                break;
             }
         }
     }

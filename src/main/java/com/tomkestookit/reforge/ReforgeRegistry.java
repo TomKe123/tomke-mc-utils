@@ -154,8 +154,8 @@ public final class ReforgeRegistry {
             s -> true, // 任何装备都可以
             List.of("§8「经验是最好的修理工。」",
                 "§7装备损坏时自动消耗经验点修复",
-                "§7每 2 秒消耗 1 经验点修 1 耐久",
-                "§8不扣等级，只扣经验条绿色部分",
+                "§7每 0.2 秒修最多 §f8 §7点耐久",
+                "§8只扣经验条绿色部分，扣完顶到 0 就停",
                 "§5史诗",
                 "§7适用于：§f任意可装备物品"),
             Items.EXPERIENCE_BOTTLE, Items.LAPIS_BLOCK);
