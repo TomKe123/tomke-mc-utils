@@ -41,7 +41,6 @@
     "LogisticsBarrelPlaceMixin",
     "LogisticsCraftingMixin",
     "XpMultiplierMixin",
-    "MagmaStriderMovementMixin",
     "OriginalWeaponEffectMixin",
     "EntitySpawnReasonHolderMixin",
     "MobEntityInitializeSpawnReasonMixin",

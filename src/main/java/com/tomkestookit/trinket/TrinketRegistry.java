@@ -158,8 +158,8 @@ public final class TrinketRegistry {
 
         reg("magma_strider", "熔岩行者", Items.MAGMA_CREAM, Items.NETHERITE_INGOT, Items.MAGMA_CREAM,
             List.of("§8「下界人管这叫'泡温泉'。」",
-                "§7在岩浆中获得 速度 III + 防火",
-                "§7大幅提升岩浆内移动速度",
+                "§7取消岩浆速度惩罚（正常走路速度）",
+                "§7在岩浆中常驻 §c防火",
                 "§e像炽足兽一样在岩浆里冲浪"),
             TrinketRegistry::applyMagmaStrider);
 
@@ -685,11 +685,24 @@ public final class TrinketRegistry {
     // ---- magma strider ----
 
     private static void applyMagmaStrider(ServerPlayerEntity p) {
-        if (!p.isSubmergedIn(net.minecraft.registry.tag.FluidTags.LAVA)
-            && !p.getWorld().getFluidState(p.getBlockPos()).isIn(net.minecraft.registry.tag.FluidTags.LAVA)) {
-            return;
-        }
-        // 在岩浆中：给防火（速度惩罚由 MagmaStriderMovementMixin 直接跳过岩浆分支）
+        if (!p.isInLava()) return;
+        // 防火（避免燃烧掉血）
         p.addStatusEffect(new StatusEffectInstance(StatusEffects.FIRE_RESISTANCE, 60, 0, true, false, true));
+
+        // 取消岩浆速度惩罚：直接修正玩家水平速度
+        // vanilla 岩浆里 velocity 会被 *0.5 衰减 + 0.02f 加速系数，实际时速极慢
+        // 我们放大水平速度分量补偿，让玩家在岩浆里能正常走路
+        net.minecraft.util.math.Vec3d vel = p.getVelocity();
+        double hSq = vel.x * vel.x + vel.z * vel.z;
+        // 只在有水平位移时补偿（玩家在按 WASD）
+        if (hSq > 1e-4) {
+            double h = Math.sqrt(hSq);
+            double target = 0.20; // 目标水平速度（略高于正常走路 0.1，抵消每 tick 衰减）
+            if (h < target) {
+                double scale = target / h;
+                p.setVelocity(vel.x * scale, vel.y, vel.z * scale);
+                p.velocityModified = true;
+            }
+        }
     }
 }
