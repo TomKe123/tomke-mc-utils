@@ -67,10 +67,10 @@ public final class OriginalWeaponRegistry {
             Items.PRISMARINE_CRYSTALS, Items.TRIDENT);
 
         reg("void_blade", "虚空之刃", Items.NETHERITE_SWORD,
-            15.0, 1.8, "§5",
+            15.0, 2.4, "§5",
             List.of("§8「一刀两个宇宙。」",
-                "§7攻击 §515 §8· 攻速 §51.8",
-                "§720% §d虚空裂隙 §7- 减速 + 持续伤害 2秒",
+                "§7攻击 §515 §8· 攻速 §52.4",
+                "§720% §d虚空裂隙 §7- 缓慢/失明 §f5秒",
                 "§720% §b维度切割 §7- 无视护甲额外 §b+50% §7伤害",
                 "§5传奇 · 末影水晶 × 8 + 下界合金剑"),
             Items.END_CRYSTAL, Items.NETHERITE_SWORD);

@@ -114,6 +114,7 @@ public final class AdminFeature {
         // ---------- UI ----------
         add("ui.sidebar",                "侧栏 TPS/MSPT",    Items.OAK_SIGN,      Group.UI, "每秒刷新");
         add("ui.tab_health",             "tab 血量红心",     Items.APPLE,         Group.UI, "关闭后需重登才彻底消失");
+        add("ui.player_nametag",         "头顶血量+等级",    Items.NAME_TAG,      Group.UI, "玩家名后附加 <HP>❤ Lv<等级>，每秒刷新");
 
         // ---------- 杂项 ----------
         add("misc.anvil_cost_cap",       "铁砧上限 100",     Items.ANVIL,         Group.MISC, "把 vanilla 40 级 \"过于昂贵\" 提到 100");

@@ -41,6 +41,9 @@ public abstract class OriginalWeaponEffectMixin {
 
         LivingEntity victim = (LivingEntity) (Object) this;
 
+        // 防止自伤（虚空裂隙 / 维度切割 / 深渊三叉戟穿甲等二次伤害不能打在攻击者自己身上）
+        if (victim == attacker) return;
+
         switch (weaponId) {
             case "blood_moon_scythe":
                 // 吸血 15%（不吸魔法/环境伤害）
@@ -65,12 +68,13 @@ public abstract class OriginalWeaponEffectMixin {
             case "void_blade":
                 net.minecraft.util.math.random.Random rng = attacker.getRandom();
 
-                // 虚空裂隙：20% 几率 —— 减速II + 凋零II 持续 2 秒（40 tick）
+                // 虚空裂隙：20% 几率 —— 缓慢 255 + 失明 255，持续 5 秒（100 tick）
+                // amplifier=254 对应等级 255（vanilla 0-based）；缓慢 255 = 完全无法移动，失明 255 = 完全黑屏
                 if (rng.nextFloat() < 0.20f) {
                     victim.addStatusEffect(new StatusEffectInstance(
-                        StatusEffects.SLOWNESS, 40, 1, false, true));
+                        StatusEffects.SLOWNESS, 100, 254, false, false, true));
                     victim.addStatusEffect(new StatusEffectInstance(
-                        StatusEffects.WITHER, 40, 1, false, true));
+                        StatusEffects.BLINDNESS, 100, 254, false, false, true));
                     attacker.sendMessage(
                         net.minecraft.text.Text.literal("§5虚空裂隙").styled(s -> s.withItalic(false)),
                         true);

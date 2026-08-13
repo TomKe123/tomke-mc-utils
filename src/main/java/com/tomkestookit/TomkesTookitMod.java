@@ -33,6 +33,7 @@ public class TomkesTookitMod implements ModInitializer {
         // 特性从"开"翻到"关"时的清理回调（server 可能为 null，处理方各自判空）
         TomkesTookitConfig.registerTearDown("world.afk", AfkDisplay::flushAll);
         TomkesTookitConfig.registerTearDown("ui.sidebar", Sidebar::uninstall);
+        TomkesTookitConfig.registerTearDown("ui.player_nametag", PlayerNameTag::uninstall);
         TomkesTookitConfig.registerTearDown("cmd.fly", FlyCommand::disableAll);
         TomkesTookitConfig.registerTearDown("world.bot_anchor", s -> BotAnchorTracker.clearAll());
 
@@ -64,6 +65,7 @@ public class TomkesTookitMod implements ModInitializer {
         PotionCauldronLabel.register();
         Sidebar.register();
         TabHealth.register();
+        PlayerNameTag.register();
         SpawnProtection.register();
         DroppedItemCleanup.register();
         TrinketEffectHandler.register();
