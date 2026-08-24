@@ -76,6 +76,7 @@ public class TomkesTookitMod implements ModInitializer {
         // Create 模组兼容：溺尸掉粗锌锭
         com.tomkestookit.compat.CreateCompat.register();
         com.tomkestookit.menu.TrashCanMenu.register();
+        com.tomkestookit.infinitebucket.InfiniteBucketHandler.register();
         PerPlayerSpawnCap.register();
         SugarTntHandler.register();
         ThrownExplosiveHandler.register();

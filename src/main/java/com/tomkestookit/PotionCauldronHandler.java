@@ -258,16 +258,16 @@ public final class PotionCauldronHandler {
 
     /**
      * 把存储的药水 NBT 应用到物品栈上（灌装出的药水瓶 / 浸的箭）。
-     * 混合药水没有 base Potion，退回 "minecraft:water" 让 vanilla 正常渲染
-     * （water 本身 0 effect，不影响实际生效）。同时保证再倒回锅里时 PotionUtil
-     * 解析出的效果 = CustomPotionEffects 列表原样，可以继续参与混合。
+     *
+     * 只搬运原始字段（Potion / CustomPotionEffects / CustomPotionColor），
+     * 不做 "water" fallback：vanilla 对 base 缺失、只有 CustomPotionEffects 的
+     * 药水物品正确渲染为"药水" + 效果列表；加 water fallback 反而会让再倒回锅时
+     * 被 potionNbt() 当成 base = water 保存，随后标签渲染成"水药水"（此 BUG 的根因）。
      */
     private static void applyPotionNbt(ItemStack stack, NbtCompound stored) {
         NbtCompound tag = stack.getOrCreateNbt();
         if (stored.contains(PotionUtil.POTION_KEY)) {
             tag.putString(PotionUtil.POTION_KEY, stored.getString(PotionUtil.POTION_KEY));
-        } else if (stored.contains(PotionUtil.CUSTOM_POTION_EFFECTS_KEY)) {
-            tag.putString(PotionUtil.POTION_KEY, "minecraft:water");
         }
         if (stored.contains(PotionUtil.CUSTOM_POTION_EFFECTS_KEY)) {
             tag.put(PotionUtil.CUSTOM_POTION_EFFECTS_KEY,

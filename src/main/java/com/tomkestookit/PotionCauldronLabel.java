@@ -173,6 +173,9 @@ public final class PotionCauldronLabel {
      *   力量 II (3:00)
      *   跳跃提升 (1:30)
      *   剩余 2 层
+     *
+     * 无效果场景（base = water / mundane / awkward / thick 或裸 vanilla 药水）：
+     *   直接读 base Potion 的显示名，退回 "水"。之前一刀切显示"水"是显示 BUG 的根因。
      */
     private static Text buildText(NbtCompound potionNbt, int level) {
         List<net.minecraft.entity.effect.StatusEffectInstance> effects =
@@ -180,8 +183,8 @@ public final class PotionCauldronLabel {
 
         MutableText result = Text.empty();
         if (effects.isEmpty()) {
-            // 无 effect：可能是纯水（未定义效果的药水）
-            result.append(Text.literal("水").formatted(Formatting.AQUA));
+            // 无 effect：显示 base Potion 名（"水" / "粗制的药水" / "浑浊的药水" / "浓稠的药水" 等）
+            result.append(basePotionName(potionNbt));
         } else if (effects.size() == 1) {
             // 单效果：优先用 base Potion 名（"力量药水"）而非效果名（"力量"）
             result.append(potionName(potionNbt, effects.get(0)));
@@ -195,6 +198,20 @@ public final class PotionCauldronLabel {
         result.append(Text.literal("\n"))
             .append(Text.literal("剩余 " + level + " 层").formatted(Formatting.GRAY));
         return result;
+    }
+
+    /**
+     * 无效果药水的显示名：读 base Potion → 用其 translation key，
+     * 找不到就退回"水"。这样 mundane / thick / awkward 都能显示成对应名字。
+     */
+    private static MutableText basePotionName(NbtCompound potionNbt) {
+        Potion potion = PotionUtil.getPotion(potionNbt);
+        if (potion == null) return Text.literal("水").formatted(Formatting.AQUA);
+        var id = Registries.POTION.getId(potion);
+        if (id == null) return Text.literal("水").formatted(Formatting.AQUA);
+        String path = id.getPath();
+        // vanilla 药水 translation key：item.minecraft.potion.effect.<path>
+        return Text.translatable("item.minecraft.potion.effect." + path).formatted(Formatting.AQUA);
     }
 
     /** 单效果行：效果名 + 强度 + 时长。*/
