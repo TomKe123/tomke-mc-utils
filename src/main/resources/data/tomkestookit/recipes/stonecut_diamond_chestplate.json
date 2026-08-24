@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "minecraft:diamond_chestplate"
+  },
+  "result": {
+    "id": "minecraft:diamond",
+    "count": 8
+  }
+}

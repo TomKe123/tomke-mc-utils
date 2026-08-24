@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "minecraft:diamond_hoe"
+  },
+  "result": {
+    "id": "minecraft:diamond",
+    "count": 2
+  }
+}

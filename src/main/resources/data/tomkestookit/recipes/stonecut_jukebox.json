@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "minecraft:jukebox"
+  },
+  "result": {
+    "id": "minecraft:diamond",
+    "count": 8
+  }
+}
