@@ -94,6 +94,10 @@ public final class SpecialCraftingCatalog {
             RegionFiller.FillerType type = RegionFillerRecipe.match3x3(input);
             if (type != null) return RegionFillerRecipe.buildResult(type);
         }
+        // 训练假人（盔甲架 + 8 干草块）
+        if (TomkesTookitConfig.enabled("recipe.training_dummy")
+            && com.tomkestookit.trainingdummy.TrainingDummyHandler.matches3x3(input))
+            return com.tomkestookit.trainingdummy.TrainingDummyHandler.buildResult();
         return ItemStack.EMPTY;
     }
 

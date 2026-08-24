@@ -95,6 +95,10 @@ public class TomkesTookitMod implements ModInitializer {
         // 素材掉落改由独立事件注册（原来由 EliteMobDropMixin 触发）
         com.tomkestookit.materials.MaterialDropHandler.register();
 
+        // 训练假人系统（配方由 TrainingDummyCraftingMixin 处理）
+        com.tomkestookit.trainingdummy.TrainingDummyHandler.register();
+        com.tomkestookit.trainingdummy.TrainingDummyCommand.register();
+
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             TomkesTookitConfig.load(server);
             CommandTaskStore.load(server);
