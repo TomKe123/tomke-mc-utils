@@ -108,6 +108,25 @@ public final class LandmarkStore {
         return true;
     }
 
+    /**
+     * 迁移地标：覆盖维度 + 坐标 + 朝向。地标不存在返回 false。
+     * 名字保持不变，图标 / 添加者也不变。
+     */
+    public static boolean setLocation(String name, String dimension,
+                                      double x, double y, double z,
+                                      float yaw, float pitch) {
+        Landmark lm = landmarks.get(name);
+        if (lm == null) return false;
+        lm.dimension = dimension;
+        lm.x = x;
+        lm.y = y;
+        lm.z = z;
+        lm.yaw = yaw;
+        lm.pitch = pitch;
+        save();
+        return true;
+    }
+
     /** 返回 true 表示删除成功。*/
     public static boolean remove(String name) {
         if (landmarks.remove(name) == null) return false;

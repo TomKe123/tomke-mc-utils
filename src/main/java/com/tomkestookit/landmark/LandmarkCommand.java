@@ -65,6 +65,10 @@ public final class LandmarkCommand {
                         .then(CommandManager.argument("name", StringArgumentType.string())
                             .suggests(NAME_SUGGESTIONS)
                             .executes(LandmarkCommand::tp)))
+                    .then(CommandManager.literal("migrate")
+                        .then(CommandManager.argument("name", StringArgumentType.string())
+                            .suggests(NAME_SUGGESTIONS)
+                            .executes(LandmarkCommand::migrate)))
                     .then(CommandManager.literal("list")
                         .executes(LandmarkCommand::list))
             ));
@@ -160,6 +164,29 @@ public final class LandmarkCommand {
         }
         player.sendMessage(Text.literal("已将 \"" + name + "\" 图标设为 " + iconId + "。")
             .formatted(Formatting.GREEN), false);
+        return 1;
+    }
+
+    private static int migrate(CommandContext<ServerCommandSource> ctx) {
+        if (disabled(ctx.getSource())) return 0;
+        ServerPlayerEntity player = tryPlayer(ctx);
+        if (player == null) return 0;
+        String name = StringArgumentType.getString(ctx, "name");
+        Landmark lm = LandmarkStore.get(name);
+        if (lm == null) {
+            player.sendMessage(Text.literal("地标 \"" + name + "\" 不存在。").formatted(Formatting.RED), false);
+            return 0;
+        }
+        String dim = player.getWorld().getRegistryKey().getValue().toString();
+        double x = player.getX(), y = player.getY(), z = player.getZ();
+        float yaw = player.getYaw(), pitch = player.getPitch();
+        if (!LandmarkStore.setLocation(name, dim, x, y, z, yaw, pitch)) {
+            player.sendMessage(Text.literal("迁移失败。").formatted(Formatting.RED), false);
+            return 0;
+        }
+        player.sendMessage(Text.literal(String.format(
+            "已把地标 \"%s\" 迁移到 %s @ %.0f, %.0f, %.0f",
+            name, dimShort(dim), x, y, z)).formatted(Formatting.GREEN), false);
         return 1;
     }
 

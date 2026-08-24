@@ -199,6 +199,16 @@ public final class LandmarkMenu {
             open(p, returnFilter, returnPage);
         });
 
+        // 迁移到玩家当前位置：覆盖维度 + 坐标 + 朝向
+        inv.setStack(31, MenuButtons.button(Items.COMPASS, "§6§l迁移到当前位置",
+            List.of("§7当前 §f" + com.tomkestookit.landmark.LandmarkCommand.dimShort(lm.dimension)
+                + String.format(" §7@ §f%.0f, %.0f, %.0f", lm.x, lm.y, lm.z),
+                "§7点击后覆盖为你所在的位置",
+                "§8朝向 / 维度也一同更新",
+                "",
+                "§6▶ 点击立即迁移")));
+        actions.put(31, p -> applyMigrate(p, lmName, returnFilter, returnPage));
+
         // 返回列表
         inv.setStack(BACK_SLOT, MenuButtons.backButton());
         actions.put(BACK_SLOT, p -> open(p, returnFilter, returnPage));
@@ -266,6 +276,29 @@ public final class LandmarkMenu {
         LandmarkStore.add(lm);
         player.sendMessage(Text.literal("§a[地标] 已添加 \"" + name + "\"。"), false);
         open(player, returnFilter, returnPage);
+    }
+
+    /** 迁移：把地标覆盖为玩家当前维度 + 坐标 + 朝向。*/
+    private static void applyMigrate(ServerPlayerEntity player, String lmName,
+                                     String returnFilter, int returnPage) {
+        Landmark cur = LandmarkStore.get(lmName);
+        if (cur == null) {
+            player.sendMessage(Text.literal("§c[地标] \"" + lmName + "\" 已不存在。"), false);
+            open(player, returnFilter, returnPage);
+            return;
+        }
+        String dim = player.getWorld().getRegistryKey().getValue().toString();
+        double x = player.getX(), y = player.getY(), z = player.getZ();
+        float yaw = player.getYaw(), pitch = player.getPitch();
+        if (!LandmarkStore.setLocation(lmName, dim, x, y, z, yaw, pitch)) {
+            player.sendMessage(Text.literal("§c[地标] 迁移失败。"), false);
+            openDetail(player, lmName, returnFilter, returnPage);
+            return;
+        }
+        player.sendMessage(Text.literal(String.format(
+            "§a[地标] 已把 \"%s\" 迁移到 §f%s §a@ §f%.0f, %.0f, %.0f",
+            lmName, com.tomkestookit.landmark.LandmarkCommand.dimShort(dim), x, y, z)), false);
+        openDetail(player, lmName, returnFilter, returnPage);
     }
 
     private static void promptRename(ServerPlayerEntity player, String lmName,
