@@ -48,3 +48,6 @@ server.properties.resource-pack.txt
 server.log
 server.pid
 server_cmd.txt
+
+# Build output logs
+build.log
