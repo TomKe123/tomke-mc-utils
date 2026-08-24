@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.ArmorStandEntity;
@@ -40,7 +41,7 @@ import java.util.Optional;
 public final class AutoCrafterHandler {
     public static final String STACK_NBT_KEY = "TomkesTookitAutoCrafter";
     public static final String MARKER_TAG = "tomkestookit_auto_crafter_marker";
-    private static final int CRAFT_INTERVAL_TICKS = 8;
+    private static final int CRAFT_INTERVAL_TICKS = 2;
     private static final java.util.Map<String, Integer> RECENTLY_BROKEN = new java.util.HashMap<>();
     private static final java.util.Map<String, AutoCrafterInventory> INV_CACHE = new java.util.HashMap<>();
 
@@ -356,14 +357,47 @@ public final class AutoCrafterHandler {
     }
 
     /**
-     * 从选定方向把产物直接以 ItemEntity 的形式弹出：
-     *   - 出生点：方块中心 + 方向单位向量 * 0.6
-     *   - 初速度：方向单位向量 * 0.2（up/down 更明显）
+     * 把产物投放到弹出方向上：
+     *   - 如果目标位置是容器（箱子/漏斗/熔炉/投掷器/发射器/堆肥桶/木桶/末影箱/潜影盒/
+     *     另一台自动合成器；以及任何模组容器，只要它是 InventoryProvider 或者
+     *     BlockEntity implements Inventory），先按漏斗规则塞入
+     *   - 塞不下的余量，才以 ItemEntity 方式从对应方向弹出
+     *   - 目标位置没容器时，直接走 ItemEntity 弹出（保持旧行为）
      */
     private static void ejectOutput(ServerWorld world, AutoCrafterTracker.Config config, ItemStack stack) {
         net.minecraft.util.math.Direction dir = parseDirection(config.ejectDirection);
         if (dir == null) return;
         BlockPos pos = AutoCrafterTracker.pos(config);
+        BlockPos target = pos.offset(dir);
+        ItemStack remaining = tryInsertIntoContainer(world, target, dir.getOpposite(), stack.copy());
+        if (remaining.isEmpty()) return;
+        dropAsEntity(world, pos, dir, remaining);
+    }
+
+    /**
+     * 尝试把 stack 塞进 {@code targetPos} 位置的容器；侧面 {@code fromSide} 是
+     * “相对目标容器来说，物品是从哪个面进来的”——即弹出方向的相反方向。
+     * 若目标不是容器返回原 stack；成功塞入的部分被扣掉，返回未消耗的余量。
+     */
+    private static ItemStack tryInsertIntoContainer(ServerWorld world, BlockPos targetPos,
+                                                    net.minecraft.util.math.Direction fromSide,
+                                                    ItemStack stack) {
+        Inventory dest = HopperBlockEntity.getInventoryAt(world, targetPos);
+        if (dest == null) return stack;
+        // vanilla 的 transfer 会处理 SidedInventory、DoubleInventory、canInsert、堆叠合并等
+        ItemStack leftover = HopperBlockEntity.transfer(null, dest, stack, fromSide);
+        // transfer 就地更新目标 inv 但可能不 markDirty；保底调一次
+        if (leftover.getCount() != stack.getCount()) dest.markDirty();
+        return leftover;
+    }
+
+    /**
+     * 从选定方向把产物以 ItemEntity 的形式弹出：
+     *   - 出生点：方块中心 + 方向单位向量 * 0.6
+     *   - 初速度：方向单位向量 * 0.2（up/down 更明显）
+     */
+    private static void dropAsEntity(ServerWorld world, BlockPos pos,
+                                     net.minecraft.util.math.Direction dir, ItemStack stack) {
         double cx = pos.getX() + 0.5;
         double cy = pos.getY() + 0.5;
         double cz = pos.getZ() + 0.5;
