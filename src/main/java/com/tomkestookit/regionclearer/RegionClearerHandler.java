@@ -28,7 +28,9 @@ import net.minecraft.util.math.BlockPos;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -44,16 +46,18 @@ public final class RegionClearerHandler {
 
     /** 一维硬边界。*/
     private static final int MAX_EDGE = 5120;
-    /** 掉落物上限：超过此数量则清理时不产生掉落，避免卡顿。*/
-    private static final int MAX_VOLUME_WITH_DROPS = 5_000_000;
+    /** 掉落物上限：超过此数量则清理时不产生掉落，避免卡顿。约 37×37×37 区域。*/
+    private static final int MAX_VOLUME_WITH_DROPS = 50_000;
     /** 清除方块数的绝对上限（int 类型上限）。*/
     private static final int MAX_TOTAL_BLOCKS = Integer.MAX_VALUE;
     /** 触发分批的方块数阈值：以下一次执行完；以上分批。*/
     private static final int SYNC_LIMIT = 32768;
-    /** 分批：每 40 tick（2 秒）跑一次。*/
-    private static final int BATCH_INTERVAL_TICKS = 40;
-    /** 每批最多处理这么多方块。*/
-    private static final int BATCH_SIZE = 4096;
+    /** 分批：每 N tick 跑一次。*/
+    private static final int BATCH_INTERVAL_TICKS = 10;
+    /** 每批最多处理这么多方块（带掉落，逐方块 loot 较慢）。*/
+    private static final int BATCH_SIZE_DROP = 8192;
+    /** 每批最多处理这么多方块（不掉落，纯 setBlockState，约 8× 于带掉落）。*/
+    private static final int BATCH_SIZE_NODROP = 65_536;
 
     private RegionClearerHandler() {}
 
@@ -68,6 +72,7 @@ public final class RegionClearerHandler {
 
     /**
      * 待确认的清除请求。玩家没点确认前，一直保留；再选点会覆盖它。
+     * forcedChunks 记录 preview 阶段强制加载的区块，转交给 job 继续持有直到清除完成。
      */
     public static final class Pending {
         public final UUID player;
@@ -77,9 +82,10 @@ public final class RegionClearerHandler {
         public final BlockPos max;
         public final int count;
         public final boolean dropItems; // 是否产生掉落物
+        public final Set<Long> forcedChunks;
 
         Pending(UUID player, ServerWorld world, RegionClearer.ClearerTier tier,
-                BlockPos min, BlockPos max, int count, boolean dropItems) {
+                BlockPos min, BlockPos max, int count, boolean dropItems, Set<Long> forcedChunks) {
             this.player = player;
             this.world = world;
             this.tier = tier;
@@ -87,27 +93,68 @@ public final class RegionClearerHandler {
             this.max = max;
             this.count = count;
             this.dropItems = dropItems;
+            this.forcedChunks = forcedChunks;
         }
     }
 
-    /** 正在执行的 job。存 Deque<BlockPos> 分批 poll。*/
+    /**
+     * 正在执行的 job。两条路径二选一：
+     *   - drop 路径：预扫描非空气方块入队 → 分批 poll，逐个走 loot table 掉落；
+     *   - nodrop 路径：不预扫描、不入队，用游标 (cx,cy,cz) 从 max.y 向 min.y 扫，
+     *     一批扫 BATCH_SIZE_NODROP 个位置直接 setBlockState 成空气。
+     *     省一次全量扫描 + 一份 Deque 内存（对上亿方块的区域非常重要），
+     *     且 setBlockState 用 NOTIFY_LISTENERS，不触发邻居更新。
+     */
     private static final class ClearJob {
         final UUID player;
         final ServerWorld world;
         final RegionClearer.ClearerTier tier;
-        final Deque<BlockPos> queue;
-        final int total;
-        final boolean dropItems; // 是否产生掉落物
-        int done;
+        final boolean dropItems;
+        final Set<Long> forcedChunks;
 
+        // drop 路径
+        final Deque<BlockPos> queue;
+
+        // nodrop 路径
+        final BlockPos min;
+        final BlockPos max;
+        int cx, cy, cz;      // 下一个要处理的位置；cy 从 max.y 向下推进
+        long remaining;      // 还剩多少方块位置未处理
+
+        final long total;    // 总计要处理的方块数（drop=队列大小；nodrop=区域体积）
+        long done;
+
+        /** drop 路径构造。*/
         ClearJob(UUID player, ServerWorld world, RegionClearer.ClearerTier tier,
-                 Deque<BlockPos> queue, boolean dropItems) {
+                 Deque<BlockPos> queue, Set<Long> forcedChunks) {
             this.player = player;
             this.world = world;
             this.tier = tier;
+            this.dropItems = true;
+            this.forcedChunks = forcedChunks;
             this.queue = queue;
+            this.min = null;
+            this.max = null;
             this.total = queue.size();
-            this.dropItems = dropItems;
+            this.remaining = queue.size();
+        }
+
+        /** nodrop 路径构造。*/
+        ClearJob(UUID player, ServerWorld world, RegionClearer.ClearerTier tier,
+                 BlockPos min, BlockPos max, long volume, Set<Long> forcedChunks) {
+            this.player = player;
+            this.world = world;
+            this.tier = tier;
+            this.dropItems = false;
+            this.forcedChunks = forcedChunks;
+            this.queue = null;
+            this.min = min;
+            this.max = max;
+            this.total = volume;
+            this.remaining = volume;
+            this.cx = min.getX();
+            this.cy = max.getY(); // 从顶向下
+            this.cz = min.getZ();
         }
     }
 
@@ -127,12 +174,14 @@ public final class RegionClearerHandler {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             UUID id = handler.player.getUuid();
             SELECTIONS.remove(id);
-            PENDING.remove(id);
+            Pending pending = PENDING.remove(id);
+            if (pending != null) releaseChunks(pending.world, pending.forcedChunks);
         });
         ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
             UUID id = player.getUuid();
             SELECTIONS.remove(id);
-            PENDING.remove(id);
+            Pending pending = PENDING.remove(id);
+            if (pending != null) releaseChunks(pending.world, pending.forcedChunks);
         });
     }
 
@@ -223,46 +272,46 @@ public final class RegionClearerHandler {
             return;
         }
 
-        // 超过 5M 体积的区域：跳过精确预扫描（太慢），不产生掉落物
+        // 覆盖旧的 pending：先释放它持有的区块，避免叠加
+        Pending oldPending = PENDING.remove(player.getUuid());
+        if (oldPending != null) releaseChunks(oldPending.world, oldPending.forcedChunks);
+
+        // 超过 50K 体积的区域：跳过精确预扫描（太慢），不产生掉落物
         boolean dropItems = volume <= MAX_VOLUME_WITH_DROPS;
         int total;
+
+        // 强制加载区域涉及的区块（预扫描和后续清除都需要）
+        // 小区域走同步加载，保证扫描 / 逐方块清除路径能拿到玩家视距外的区块数据；
+        // 大区域走 fill 路径，fill 命令自己会同步加载子区块，这里不必一次性把所有区块拉进内存
+        Set<Long> forcedChunks = forceLoadChunks(world, min, max, dropItems);
 
         if (!dropItems) {
             // 大区域：不做预扫描，估算为 volume 本身（上限 int）
             total = volume > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) volume;
             player.sendMessage(Text.literal(
-                "§e[区域清除] §c区域体积超过 5M，此次清理不会掉落任何物品。§7(避免卡顿)"), false);
+                "§e[区域清除] §c区域体积超过 50K，此次清理不会掉落任何物品。§7(避免卡顿)"), false);
         } else {
-            // 正常区域：精确预扫描
+            // 正常区域：精确预扫描（区块已同步加载，直接读即可）
             total = 0;
-            int unloadedChunks = 0;
             BlockPos.Mutable m = new BlockPos.Mutable();
             for (int y = min.getY(); y <= max.getY(); y++) {
                 for (int x = min.getX(); x <= max.getX(); x++) {
                     for (int z = min.getZ(); z <= max.getZ(); z++) {
                         m.set(x, y, z);
-                        if (!world.isChunkLoaded(x >> 4, z >> 4)) {
-                            unloadedChunks++;
-                            continue;
-                        }
                         if (!world.getBlockState(m).isAir()) total++;
                     }
                 }
             }
-
-            if (unloadedChunks > 0) {
-                player.sendMessage(Text.literal(String.format(
-                    "§c[区域清除] 区域内有 %d 个未加载方块位置，请靠近再选取，已取消。", unloadedChunks)), false);
-                PENDING.remove(player.getUuid());
-                return;
-            }
         }
 
-        Pending pending = new Pending(player.getUuid(), world, tier, min, max, total, dropItems);
+        Pending pending = new Pending(player.getUuid(), world, tier, min, max, total, dropItems, forcedChunks);
         PENDING.put(player.getUuid(), pending);
 
-        int batches = (total + BATCH_SIZE - 1) / BATCH_SIZE;
-        int seconds = total <= SYNC_LIMIT ? 0 : (batches * BATCH_INTERVAL_TICKS / 20);
+        // 预估分批数：drop 路径按预扫描出的 total 分批；nodrop 路径按整体积分批
+        int batchSize = dropItems ? BATCH_SIZE_DROP : BATCH_SIZE_NODROP;
+        long unit = dropItems ? total : volume;
+        long batches = (unit + batchSize - 1) / batchSize;
+        long seconds = unit <= SYNC_LIMIT ? 0 : (batches * BATCH_INTERVAL_TICKS / 20);
 
         MutableText line1 = Text.literal(String.format(
             "§7[区域清除] 区域 §f(%d,%d,%d) → (%d,%d,%d)§7 · 方块 §f%d",
@@ -318,30 +367,52 @@ public final class RegionClearerHandler {
             player.sendMessage(Text.literal("§7[区域清除] 工具已耗尽。"), false);
         }
 
-        Deque<BlockPos> queue = new ArrayDeque<>(Math.min(p.count, 1 << 20));
-        BlockPos.Mutable m = new BlockPos.Mutable();
-        for (int y = p.min.getY(); y <= p.max.getY(); y++) {
-            for (int x = p.min.getX(); x <= p.max.getX(); x++) {
-                for (int z = p.min.getZ(); z <= p.max.getZ(); z++) {
-                    m.set(x, y, z);
-                    if (!p.world.isChunkLoaded(x >> 4, z >> 4)) continue;
-                    if (!p.world.getBlockState(m).isAir()) {
-                        queue.add(m.toImmutable());
+        // 复用 preview 阶段已加载的区块（job 完成后统一释放）
+        Set<Long> forcedChunks = p.forcedChunks != null ? p.forcedChunks : new HashSet<>();
+
+        ClearJob job;
+        long expectedCount;
+
+        if (p.dropItems) {
+            // drop 路径：预扫描非空气方块入队 → 分批 poll 走 loot table
+            // 从上往下入队：Deque 从队首 poll，先清顶层，避免上方水/岩浆流回已清空的下层
+            Deque<BlockPos> queue = new ArrayDeque<>(Math.min(p.count, 1 << 20));
+            BlockPos.Mutable m = new BlockPos.Mutable();
+            for (int y = p.max.getY(); y >= p.min.getY(); y--) {
+                for (int x = p.min.getX(); x <= p.max.getX(); x++) {
+                    for (int z = p.min.getZ(); z <= p.max.getZ(); z++) {
+                        m.set(x, y, z);
+                        if (!p.world.getBlockState(m).isAir()) {
+                            queue.add(m.toImmutable());
+                        }
                     }
                 }
             }
+            expectedCount = queue.size();
+            job = new ClearJob(player.getUuid(), p.world, tier, queue, forcedChunks);
+        } else {
+            // nodrop 路径：不预扫描、不入队。游标扫描整个体积，直接 setBlockState 抹平
+            long dx = (long) p.max.getX() - p.min.getX() + 1;
+            long dy = (long) p.max.getY() - p.min.getY() + 1;
+            long dz = (long) p.max.getZ() - p.min.getZ() + 1;
+            long volume = dx * dy * dz;
+            expectedCount = volume;
+            job = new ClearJob(player.getUuid(), p.world, tier, p.min, p.max, volume, forcedChunks);
         }
 
-        ClearJob job = new ClearJob(player.getUuid(), p.world, tier, queue, p.dropItems);
-        if (queue.size() <= SYNC_LIMIT) {
+        int batchSize = job.dropItems ? BATCH_SIZE_DROP : BATCH_SIZE_NODROP;
+        if (expectedCount <= SYNC_LIMIT) {
             // 一次性跑完
-            runBatch(job, queue.size());
+            runBatch(job, (int) expectedCount);
+            releaseChunks(p.world, forcedChunks);
             player.sendMessage(Text.literal(String.format(
                 "§a[区域清除] 完成，共清 §f%d§a 方块。", job.done)), false);
         } else {
             RUNNING.put(player.getUuid(), job);
+            long batches = (expectedCount + batchSize - 1) / batchSize;
             player.sendMessage(Text.literal(String.format(
-                "§a[区域清除] 已开始，共 §f%d§a 方块，分批推进。", queue.size())), false);
+                "§a[区域清除] 已开始，共 §f%d§a 方块，分 §f%d§a 批推进%s。",
+                expectedCount, batches, job.dropItems ? "" : "（无掉落·加速）")), false);
         }
         // 清空选点
         SELECTIONS.remove(player.getUuid());
@@ -356,11 +427,53 @@ public final class RegionClearerHandler {
             player.sendMessage(Text.literal("§7[区域清除] 没有待确认的区域。"), false);
             return 0;
         }
+        // 释放 preview 阶段加载的区块
+        releaseChunks(removed.world, removed.forcedChunks);
         player.sendMessage(Text.literal("§7[区域清除] 已取消。"), false);
         return 1;
     }
 
     // ------------------------------------------------------------------ tick / job
+
+    /**
+     * 强制加载区域涉及的所有区块，返回已加载的区块集合（ChunkPos.toLong 编码）。
+     *
+     * setChunkForced 只是加 ForcedTicket，实际加载走 ChunkTicketManager 异步流程，
+     * 立即 isChunkLoaded 通常仍为 false。当 syncLoad=true 时，追加一次 getChunk(cx,cz)
+     * 同步加载到 FULL 状态，保证紧接着的方块扫描能拿到真实数据（否则玩家视距外的区块
+     * 会被当成"未加载"跳过，最终清理时漏掉这些位置）。
+     *
+     * 对于超大区域（走 nodrop 路径），可传 syncLoad=false：nodrop 路径不做预扫描，
+     * 区块由 setBlockState 按需同步加载，分摊到多批 tick 中，不会一口气卡爆服务器。
+     */
+    private static Set<Long> forceLoadChunks(ServerWorld world, BlockPos min, BlockPos max,
+                                             boolean syncLoad) {
+        Set<Long> forced = new HashSet<>();
+        int minCx = min.getX() >> 4, maxCx = max.getX() >> 4;
+        int minCz = min.getZ() >> 4, maxCz = max.getZ() >> 4;
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
+                world.setChunkForced(cx, cz, true);
+                if (syncLoad) {
+                    // 同步加载到 FULL 状态；玩家视距外 / 从未加载过的区块会被从磁盘或生成器载入
+                    world.getChunk(cx, cz);
+                }
+                forced.add(net.minecraft.util.math.ChunkPos.toLong(cx, cz));
+            }
+        }
+        return forced;
+    }
+
+    /** 取消区域涉及的区块的强制加载。*/
+    private static void releaseChunks(ServerWorld world, Set<Long> forcedChunks) {
+        if (forcedChunks == null) return;
+        for (long packed : forcedChunks) {
+            int cx = net.minecraft.util.math.ChunkPos.getPackedX(packed);
+            int cz = net.minecraft.util.math.ChunkPos.getPackedZ(packed);
+            world.setChunkForced(cx, cz, false);
+        }
+        forcedChunks.clear();
+    }
 
     private static void tick(MinecraftServer server) {
         // 每 10 tick 给 pending 玩家撒红石粒子边框
@@ -379,17 +492,22 @@ public final class RegionClearerHandler {
             ClearJob job = entry.getValue();
             ServerPlayerEntity player = server.getPlayerManager().getPlayer(job.player);
             if (player == null) return false; // 玩家离线：保留 job，等回来
-            // 玩家在线就继续推进；job 已扣耐久，工具是否还完好不再影响 job 完成。
-            runBatch(job, BATCH_SIZE);
-            if (job.queue.isEmpty()) {
+
+            int batchSize = job.dropItems ? BATCH_SIZE_DROP : BATCH_SIZE_NODROP;
+            runBatch(job, batchSize);
+
+            if (job.remaining <= 0) {
+                releaseChunks(job.world, job.forcedChunks);
                 player.sendMessage(Text.literal(String.format(
-                    "§a[区域清除] 完成，共清 §f%d§a / §f%d§a 方块。", job.done, job.total)), false);
+                    "§a[区域清除] 完成，共清 §f%d§a / §f%d§a 方块%s。",
+                    job.done, job.total, job.dropItems ? "" : "（无掉落）")), false);
                 return true;
             }
-            // 每批发个进度
+            // 每批发个进度（actionbar）
+            long batches = (job.remaining + batchSize - 1) / batchSize;
             player.sendMessage(Text.literal(String.format(
                 "§7[区域清除] §f%d§7 / §f%d§7 方块，剩余 §f%d§7 批",
-                job.done, job.total, (job.queue.size() + BATCH_SIZE - 1) / BATCH_SIZE)), true);
+                job.done, job.total, batches)), true);
             return false;
         });
     }
@@ -443,8 +561,17 @@ public final class RegionClearerHandler {
         }
     }
 
-    /** 从 queue 里 poll 至多 n 个方块清掉。*/
+    /**
+     * 处理一批方块。分派到 drop / nodrop 两条实现，均使用 NOTIFY_LISTENERS 标志位，
+     * 不触发邻居更新，不影响清除区域外的方块。
+     */
     private static void runBatch(ClearJob job, int n) {
+        if (job.dropItems) runBatchDrop(job, n);
+        else runBatchNoDrop(job, n);
+    }
+
+    /** drop 路径：从预扫描队列里 poll 至多 n 个方块，逐个走 loot table 掉落。*/
+    private static void runBatchDrop(ClearJob job, int n) {
         ServerWorld world = job.world;
         ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(job.player);
         // loot table 用的 tool：用 tier 对应的干净 vanilla 斧头，语义等同于纯净镐子挖，
@@ -454,42 +581,96 @@ public final class RegionClearerHandler {
         for (int i = 0; i < n; i++) {
             BlockPos pos = job.queue.poll();
             if (pos == null) break;
-            // chunk 卸载了就跳过，避免同步等区块
-            if (!world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
+            job.remaining--;
+            // 区块在 preview 阶段已 setChunkForced，job 完成前不会卸载；
+            // 若极端情况仍未加载，getBlockState 会同步加载，不再跳过（跳过会漏清）
             BlockState state = world.getBlockState(pos);
             if (state.isAir()) continue;
 
             // 掉落策略：
-            //   - job.dropItems = false：无论什么方块，都不掉落（超大区域模式）
-            //   - job.dropItems = true：
-            //       - 基岩：不掉落
-            //       - 流体（水 / 岩浆 / 粉雪 / 其它 FluidBlock）：不掉落，直接抹掉
-            //       - 其他 hardness < 0 的方块（命令方块 / 屏障 / 门框等）：不掉落
-            //       - 其余：按 vanilla loot table 掉落（工具用 tier 对应干净斧头）
+            //   - 基岩：不掉落
+            //   - 流体（水 / 岩浆 / 其它 FluidBlock）：不掉落，直接抹掉
+            //   - 其他 hardness < 0 的方块（命令方块 / 屏障 / 门框等）：不掉落
+            //   - 其余：按 vanilla loot table 计算掉落，然后汇入垃圾桶（不生成 ItemEntity）
             // waterlogged 方块（楼梯 / 栅栏泡水）本身是可掉落 block，不算流体；
             // 只有 FluidBlock 本体（水源 / 岩浆源及流动）视为流体不掉落
-            boolean shouldDrop = job.dropItems;
-            if (shouldDrop) {
-                boolean isFluid = state.getBlock() instanceof FluidBlock;
-                if (state.isOf(Blocks.BEDROCK) || isFluid) {
-                    shouldDrop = false;
-                } else {
-                    float hardness;
-                    try {
-                        hardness = state.getHardness(null, null);
-                    } catch (Throwable t) {
-                        hardness = 0f; // 读取失败按可挖处理
-                    }
-                    shouldDrop = hardness >= 0f;
+            boolean shouldDrop;
+            boolean isFluid = state.getBlock() instanceof FluidBlock;
+            if (state.isOf(Blocks.BEDROCK) || isFluid) {
+                shouldDrop = false;
+            } else {
+                float hardness;
+                try {
+                    hardness = state.getHardness(null, null);
+                } catch (Throwable t) {
+                    hardness = 0f; // 读取失败按可挖处理
                 }
+                shouldDrop = hardness >= 0f;
             }
             if (shouldDrop) {
                 BlockEntity be = state.hasBlockEntity() ? world.getBlockEntity(pos) : null;
-                Block.dropStacks(state, world, pos, be, player, toolForDrop);
+                java.util.List<ItemStack> drops = Block.getDroppedStacks(state, world, pos, be, player, toolForDrop);
+                for (ItemStack drop : drops) {
+                    com.tomkestookit.menu.TrashCanMenu.deposit(drop);
+                }
             }
             world.setBlockState(pos, Blocks.AIR.getDefaultState(),
                 Block.NOTIFY_LISTENERS | Block.FORCE_STATE);
             job.done++;
         }
+    }
+
+    /**
+     * nodrop 路径：游标扫描 n 个位置，非空气直接 setBlockState 成空气。
+     * 不做 loot table、不建队列、不 isAir 前预扫，速度接近纯 setBlockState 的极限。
+     * 仍用 NOTIFY_LISTENERS，只把变更推给客户端，不触发邻居更新。
+     *
+     * 掉落物汇入垃圾桶：不生成 ItemEntity（这本来就是"不掉落"路径的初衷 —— 避免大区域
+     * 生成海量掉落物卡服），但把方块本体的物品形式（Block.asItem）单条累加到全服垃圾桶。
+     * 用简化路径而非 loot table，避免 loot 采样在千万级方块上拖垮 tick。
+     */
+    private static void runBatchNoDrop(ClearJob job, int n) {
+        ServerWorld world = job.world;
+        BlockPos.Mutable m = new BlockPos.Mutable();
+        BlockState air = Blocks.AIR.getDefaultState();
+        int minX = job.min.getX(), maxX = job.max.getX();
+        int minY = job.min.getY();
+        int minZ = job.min.getZ(), maxZ = job.max.getZ();
+
+        int cx = job.cx, cy = job.cy, cz = job.cz;
+        int processed = 0;
+        while (processed < n && cy >= minY) {
+            m.set(cx, cy, cz);
+            BlockState state = world.getBlockState(m);
+            if (!state.isAir()) {
+                // 汇入垃圾桶：跳过流体 / 基岩 / hardness<0 的方块，跟 drop 路径策略一致
+                boolean isFluid = state.getBlock() instanceof FluidBlock;
+                if (!state.isOf(Blocks.BEDROCK) && !isFluid) {
+                    net.minecraft.item.Item asItem = state.getBlock().asItem();
+                    if (asItem != null && asItem != net.minecraft.item.Items.AIR) {
+                        com.tomkestookit.menu.TrashCanMenu.deposit(new ItemStack(asItem));
+                    }
+                }
+                world.setBlockState(m, air, Block.NOTIFY_LISTENERS | Block.FORCE_STATE);
+                job.done++;
+            }
+            processed++;
+
+            // 从上往下扫：z 先走完 → x → y 递减
+            cz++;
+            if (cz > maxZ) {
+                cz = minZ;
+                cx++;
+                if (cx > maxX) {
+                    cx = minX;
+                    cy--;
+                }
+            }
+        }
+        job.cx = cx;
+        job.cy = cy;
+        job.cz = cz;
+        job.remaining -= processed;
+        if (cy < minY) job.remaining = 0; // 到底了，钳到 0
     }
 }

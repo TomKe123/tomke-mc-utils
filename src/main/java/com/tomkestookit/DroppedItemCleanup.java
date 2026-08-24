@@ -435,7 +435,13 @@ public final class DroppedItemCleanup {
                 toRemove.add(entity);
             }
         }
-        for (var e : toRemove) e.discard();
+        // 掉落物先汇入垃圾桶；经验球没有对应物品栈，直接抹掉
+        for (var e : toRemove) {
+            if (e instanceof ItemEntity ie) {
+                com.tomkestookit.menu.TrashCanMenu.deposit(ie.getStack());
+            }
+            e.discard();
+        }
         return toRemove.size();
     }
 

@@ -197,8 +197,11 @@ public final class MenuUi {
 
     private static ItemStack trashCanButton() {
         return MenuButtons.button(Items.LAVA_BUCKET, "§c§l垃圾桶",
-            List.of("§7全服共享 540 格垃圾桶",
-                "§7每 10 分钟自动清空",
+            List.of("§7全服共享 · 每 10 分钟清空",
+                "§7自动/卡顿/区域清除的物品",
+                "§7会汇总到这里（角标为过量数）",
+                "§7点条目可选择提取数量",
+                "§8* 全部 · = 填满 · 空 取消 · 支持 3*64",
                 "",
                 "§a▶ 点击打开"));
     }
