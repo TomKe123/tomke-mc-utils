@@ -18,15 +18,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * 铁砧重铸：装备(左) + 重铸石(右) → 装备追加属性。
  *
- * v2 新增：跨装备重铸合并
- *   - 装备A(左) + 装备B(右)，两者都有重铸 → 输出槽 = A 合并 B 的重铸（剔除不适配A的）
- *   - 特殊武器禁止改名：铁砧输入框输入任何名字都不生效，保留原有格式化名称
+ * vanilla 同类装备合并时，右侧带的经验汲取会带到产物上（附魔合并 / 费用仍走 vanilla）。
+ * 特殊武器禁止改名：铁砧输入框输入任何名字都不生效，保留原有格式化名称。
  *
  * 兼容性：
  *   - 不覆盖已有属性，追加到 AttributeModifiers 列表末尾
  *   - 每块重铸石通过 UUID 去重，同一块不能打两次
  *   - 对任意 mod 装备生效（只要通过 canApply 判定）
- *   - priority = 1100，在 AnvilAntigravMixin(1000) 之后运行
+ *   - priority = 1100
  */
 @Mixin(value = AnvilScreenHandler.class, priority = 1100)
 public abstract class AnvilReforgeMixin {
@@ -71,47 +70,23 @@ public abstract class AnvilReforgeMixin {
             }
         }
 
-        // ---- 路径 2：左装备A + 右装备B（B有重铸） → 把B的适配重铸合并到A ----
+        // ---- 路径 2：vanilla 同类装备合并时，把右侧的经验汲取带到产物上 ----
+        // 附魔合并、等级与费用全部交给 vanilla；vanilla 没产物（不可合并）时不介入。
         NbtCompound rightNbt = right.getNbt();
-        if (rightNbt != null && rightNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
-
+        ItemStack vanillaOut = self.getSlot(2).getStack();
+        if (!vanillaOut.isEmpty() && rightNbt != null && rightNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
+            ItemStack result = vanillaOut;
+            boolean merged = false;
             NbtList rightApplied = rightNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
-
-            java.util.Set<String> leftIds = new java.util.HashSet<>();
-            NbtCompound leftNbt = left.getNbt();
-            if (leftNbt != null && leftNbt.contains(ReforgeRegistry.APPLIED_TAG)) {
-                NbtList leftApplied = leftNbt.getList(ReforgeRegistry.APPLIED_TAG, 8);
-                for (int i = 0; i < leftApplied.size(); i++) {
-                    leftIds.add(leftApplied.getString(i));
-                }
-            }
-
-            java.util.List<ReforgeRegistry.ReforgeDef> toMerge = new java.util.ArrayList<>();
             for (int i = 0; i < rightApplied.size(); i++) {
-                String rightId = rightApplied.getString(i);
-                if (!leftIds.contains(rightId)) {
-                    ReforgeRegistry.ReforgeDef def = ReforgeRegistry.byId(rightId);
-                    if (def != null && def.canApply().test(left)) {
-                        toMerge.add(def);
-                    }
-                }
+                ReforgeRegistry.ReforgeDef def = ReforgeRegistry.byId(rightApplied.getString(i));
+                if (def == null || !def.canApply().test(result) || ReforgeRegistry.alreadyApplied(result, def)) continue;
+                result = ReforgeRegistry.applyReforge(result, def);
+                merged = true;
             }
-
-            if (!toMerge.isEmpty()) {
-                ItemStack result = left.copy();
-                int totalCost = 0;
-                for (ReforgeRegistry.ReforgeDef def : toMerge) {
-                    result = ReforgeRegistry.applyReforge(result, def);
-                    totalCost += def.anvilCost();
-                }
-
-                // 合并右侧装备的附魔（左侧已在 copy() 时带上自己的附魔）
-                mergeEnchantments(result, right);
-
+            if (merged) {
                 if (leftIsSpecial) restoreFormattedName(result, left);
-
                 self.getSlot(2).setStack(result);
-                this.levelCost.set(Math.min(totalCost, 39));
                 return;
             }
         }
@@ -125,58 +100,6 @@ public abstract class AnvilReforgeMixin {
                 self.getSlot(2).setStack(out);
             }
         }
-    }
-
-    /**
-     * 把 source 的附魔合并进 target：
-     *   - 相同附魔取较高等级（vanilla 铁砧行为）
-     *   - source 有 target 没有的附魔直接追加
-     *   - 忽略互斥附魔（简化：全部允许，符合本 mod 的宽松风格）
-     *   - 只处理 "Enchantments" tag；"StoredEnchantments"（附魔书）不合并
-     */
-    private static void mergeEnchantments(ItemStack target, ItemStack source) {
-        NbtCompound srcNbt = source.getNbt();
-        if (srcNbt == null || !srcNbt.contains("Enchantments")) return;
-        NbtList srcList = srcNbt.getList("Enchantments", 10);
-        if (srcList.isEmpty()) return;
-
-        NbtCompound tgtNbt = target.getOrCreateNbt();
-        NbtList tgtList = tgtNbt.contains("Enchantments")
-            ? tgtNbt.getList("Enchantments", 10)
-            : new NbtList();
-
-        for (int i = 0; i < srcList.size(); i++) {
-            NbtCompound srcEnch = srcList.getCompound(i);
-            String srcId = srcEnch.getString("id");
-            int srcLvl = srcEnch.getInt("lvl");
-            if (srcId.isEmpty()) continue;
-
-            // 查找目标是否已有同名附魔
-            int existingIdx = -1;
-            for (int j = 0; j < tgtList.size(); j++) {
-                NbtCompound tgtEnch = tgtList.getCompound(j);
-                if (srcId.equals(tgtEnch.getString("id"))) {
-                    existingIdx = j;
-                    break;
-                }
-            }
-            if (existingIdx >= 0) {
-                NbtCompound tgtEnch = tgtList.getCompound(existingIdx);
-                int tgtLvl = tgtEnch.getInt("lvl");
-                if (srcLvl > tgtLvl) {
-                    tgtEnch.putInt("lvl", srcLvl);
-                } else if (srcLvl == tgtLvl) {
-                    // 同等级 → +1（vanilla 铁砧行为）
-                    tgtEnch.putInt("lvl", tgtLvl + 1);
-                }
-            } else {
-                NbtCompound newEnch = new NbtCompound();
-                newEnch.putString("id", srcId);
-                newEnch.putInt("lvl", srcLvl);
-                tgtList.add(newEnch);
-            }
-        }
-        tgtNbt.put("Enchantments", tgtList);
     }
 
     /**

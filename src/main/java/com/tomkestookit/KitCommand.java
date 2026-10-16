@@ -8,7 +8,6 @@ import com.tomkestookit.regionfiller.RegionFillerHandler;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -139,15 +138,26 @@ public class KitCommand {
             return 0;
         }
 
-        if (KitTracker.hasClaimed(player.getUuid())) {
-            player.sendMessage(Text.literal("你已经领取过 Kit！").formatted(Formatting.RED), false);
-            return 0;
+        return tryClaim(player, false) ? 1 : 0;
+    }
+
+    /**
+     * 命令 / 菜单共用的领取入口：两次领取间隔 24h（{@link KitTracker#COOLDOWN_MS}）。
+     * @param actionBar 提示是否走动作栏（菜单内用 true，聊天命令用 false）
+     * @return 是否真的发了物品
+     */
+    public static boolean tryClaim(ServerPlayerEntity player, boolean actionBar) {
+        long left = KitTracker.remainingCooldown(player.getUuid());
+        if (left > 0) {
+            player.sendMessage(Text.literal("Kit 冷却中，" + KitTracker.formatRemaining(left) + "后可再次领取")
+                .formatted(Formatting.RED), actionBar);
+            return false;
         }
 
         giveKitItems(player);
         KitTracker.markClaimed(player.getUuid());
-        player.sendMessage(Text.literal("已领取 Kit！").formatted(Formatting.GREEN), false);
-        return 1;
+        player.sendMessage(Text.literal("已领取 Kit！24 小时后可再次领取").formatted(Formatting.GREEN), actionBar);
+        return true;
     }
 
     /**
@@ -167,21 +177,9 @@ public class KitCommand {
      * 也是"重置默认"按钮的数据源。
      */
     public static List<ItemStack> buildDefaultKit() {
-        // 反重力皮靴
-        ItemStack boots = new ItemStack(Items.LEATHER_BOOTS);
-        boots.setCustomName(Text.literal("反重力皮靴").formatted(Formatting.RED));
-
-        // 反重力属性 + 速度 + 无损（Kit 版与铁砧转移版共用逻辑）
-        AntigravBootsHandler.applyAntigrav(boots);
-
-        // 皮靴专属：染红色
-        NbtCompound nbt = boots.getOrCreateNbt();
-        NbtCompound display = nbt.contains("display") ? nbt.getCompound("display") : new NbtCompound();
-        display.putInt("color", 0xFF0000);
-        nbt.put("display", display);
-
+        // 反重力皮靴不再随礼包发放，改为 3×3 合成（见 AntigravBootsHandler.matches3x3）
         return List.of(
-            boots,
+            new ItemStack(Items.LEATHER_BOOTS),
             new ItemStack(Items.LEATHER_HELMET),
             new ItemStack(Items.LEATHER_CHESTPLATE),
             new ItemStack(Items.LEATHER_LEGGINGS),

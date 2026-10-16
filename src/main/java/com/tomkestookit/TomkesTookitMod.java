@@ -5,7 +5,6 @@ import com.tomkestookit.commandtask.CommandTaskStore;
 import com.tomkestookit.landmark.LandmarkCommand;
 import com.tomkestookit.landmark.LandmarkStore;
 import com.tomkestookit.network.ResourcePackServer;
-import com.tomkestookit.trinket.TrinketEffectHandler;
 import com.tomkestookit.trinket.TrinketStore;
 import com.tomkestookit.menu.MenuClock;
 import net.fabricmc.api.ModInitializer;
@@ -68,8 +67,9 @@ public class TomkesTookitMod implements ModInitializer {
         PlayerNameTag.register();
         SpawnProtection.register();
         DroppedItemCleanup.register();
-        TrinketEffectHandler.register();
-        com.tomkestookit.trinket.TrinketCommand.register();
+        // 饰品 / 重铸石效果已撤销回原版；只保留经验汲取（soul_mend）。
+        // TrinketStore 仍加载：玩家上线时由 TrinketRevert 把饰品袋里的东西退回背包。
+        com.tomkestookit.trinket.TrinketRevert.register();
         com.tomkestookit.reforge.AutoMenderHandler.register();
         com.tomkestookit.reforge.ReforgeRefreshHandler.register();
 
@@ -140,6 +140,7 @@ public class TomkesTookitMod implements ModInitializer {
 
     public static void sendKitMessage(ServerPlayerEntity player) {
         if (!TomkesTookitConfig.enabled("misc.kit_on_join")) return;
+        if (KitTracker.remainingCooldown(player.getUuid()) > 0) return; // 24h 冷却中不提示
         Text hover = Text.literal("点击领取 Kit").formatted(Formatting.YELLOW);
         Text message = Text.empty()
             .append(Text.literal("[Kit] ").formatted(Formatting.GOLD, Formatting.BOLD))

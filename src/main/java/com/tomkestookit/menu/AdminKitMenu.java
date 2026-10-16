@@ -70,7 +70,7 @@ public final class AdminKitMenu {
         // 一键重置为默认
         inv.setStack(40, MenuButtons.button(Items.REDSTONE_BLOCK, "§c§l重置为默认礼包",
             List.of("§7恢复代码内建的默认 kit",
-                "§f反重力皮靴 §7+ 皮甲全套 + 石镐斧",
+                "§7皮甲全套 + 石镐斧",
                 "§f16 面包 §7+ 菜单时钟",
                 "",
                 "§c▶ 点击立即重置")));

@@ -49,12 +49,9 @@ public final class SpecialCraftingCatalog {
                 com.tomkestookit.infinitebucket.InfiniteBucketRecipe.match3x3(input);
             if (type != null) return com.tomkestookit.infinitebucket.InfiniteBucket.build(type);
         }
-        // 饰品合成
-        if (TomkesTookitConfig.enabled("recipe.trinket")) {
-            com.tomkestookit.trinket.TrinketRegistry.TrinketDef trinket =
-                com.tomkestookit.trinket.TrinketRegistry.match3x3(input);
-            if (trinket != null) return com.tomkestookit.trinket.TrinketRegistry.buildStack(trinket);
-        }
+        // 反重力皮靴（中心皮靴 + 8 幻翼膜）
+        if (TomkesTookitConfig.enabled("recipe.antigrav_boots")
+            && AntigravBootsHandler.matches3x3(input)) return AntigravBootsHandler.buildRecipeResult(input);
         // 重铸石合成
         if (TomkesTookitConfig.enabled("item.reforge")) {
             com.tomkestookit.reforge.ReforgeRegistry.ReforgeDef reforge =

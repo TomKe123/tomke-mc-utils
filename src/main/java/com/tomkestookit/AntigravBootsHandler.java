@@ -11,13 +11,17 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.inventory.RecipeInputInventory;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.Map;
 import java.util.UUID;
@@ -144,6 +148,43 @@ public final class AntigravBootsHandler {
         return !stack.isEmpty()
             && stack.getItem() instanceof ArmorItem armor
             && armor.getSlotType() == EquipmentSlot.FEET;
+    }
+
+    /**
+     * 3×3 合成：中心皮靴 + 四周 8 幻翼膜 → 反重力皮靴。
+     * 中心已经是反重力靴时不匹配，避免白白吃掉材料。
+     */
+    public static boolean matches3x3(RecipeInputInventory input) {
+        if (input.getWidth() != 3 || input.getHeight() != 3) return false;
+        ItemStack center = input.getStack(4);
+        if (center.getItem() != Items.LEATHER_BOOTS || hasAntigrav(center)) return false;
+        int[] surround = {0, 1, 2, 3, 5, 6, 7, 8};
+        for (int i : surround) if (input.getStack(i).getItem() != Items.PHANTOM_MEMBRANE) return false;
+        return true;
+    }
+
+    /**
+     * 合成产物：在中心皮靴的副本上施加反重力（保留原有附魔 / 染色 / 命名），
+     * 没命名的补上"反重力皮靴"，没染色的染成和旧 Kit 版一样的红色。
+     */
+    public static ItemStack buildRecipeResult(RecipeInputInventory input) {
+        ItemStack boots = input.getStack(4).copyWithCount(1);
+        applyAntigrav(boots);
+        if (!boots.hasCustomName()) {
+            boots.setCustomName(Text.literal("反重力皮靴").formatted(Formatting.RED));
+        }
+        NbtCompound display = boots.getOrCreateSubNbt("display");
+        if (!display.contains("color")) display.putInt("color", 0xFF0000);
+        return boots;
+    }
+
+    /** 配方菜单展示用的产物示意。*/
+    public static ItemStack buildDisplayStack() {
+        ItemStack boots = new ItemStack(Items.LEATHER_BOOTS);
+        applyAntigrav(boots);
+        boots.setCustomName(Text.literal("反重力皮靴").formatted(Formatting.RED));
+        boots.getOrCreateSubNbt("display").putInt("color", 0xFF0000);
+        return boots;
     }
 
     private static boolean isWearingAntigravBoots(LivingEntity entity) {

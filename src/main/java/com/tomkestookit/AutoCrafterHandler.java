@@ -278,6 +278,21 @@ public final class AutoCrafterHandler {
             }
         }
 
+        // 3.5) 虚拟输入只按物品 id 匹配，带 NBT 的皮靴（附魔 / 染色 / 命名 / 已是反重力）会在
+        //      反重力靴配方里被当成白板吃掉，这类情况跳过，交给玩家手工合成
+        //      （只看第 4 步会扣到的那一组皮靴：从前到后第一个非空皮靴槽）
+        if (AntigravBootsHandler.matches3x3(input)) {
+            for (int i = 0; i < 9; i++) {
+                ItemStack s = inv.getStack(i);
+                if (!s.isOf(Items.LEATHER_BOOTS)) continue;
+                if (s.hasNbt()) {
+                    updateStatus(world, config, "异常");
+                    return false;
+                }
+                break;
+            }
+        }
+
         // 4) 按需求数量从缓存池扣（从前到后遍历缓存槽）
         for (var e : need.entrySet()) {
             int remaining = e.getValue();

@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * 饰品注册表：8 种饰品的定义、合成判定、物品生成。
+ * 饰品注册表（饰品系统已撤销回原版，只剩定义 + getId 供 ReforgeRefreshHandler 识别遗留饰品并清掉 NBT）。
  */
 public final class TrinketRegistry {
 
@@ -413,7 +413,10 @@ public final class TrinketRegistry {
     /** 从 ItemStack 读取 trinket id，非饰品返回 null。*/
     public static String getId(ItemStack stack) {
         if (stack.isEmpty()) return null;
-        NbtCompound nbt = stack.getNbt();
+        return getId(stack.getNbt());
+    }
+
+    public static String getId(NbtCompound nbt) {
         if (nbt == null || !nbt.contains(NBT_KEY)) return null;
         return nbt.getString(NBT_KEY);
     }

@@ -90,14 +90,6 @@ public final class MenuUi {
         inv.setStack(43, recipeButton(player));
         actions.put(43, RecipeMenu::open);
 
-        // 饰品袋入口
-        inv.setStack(44, MenuButtons.button(Items.ENDER_EYE, "§5§l饰品袋",
-            List.of("§727 格饰品容器",
-                "§7放入饰品即可获得被动效果",
-                "",
-                "§a▶ 点击打开")));
-        actions.put(44, TrinketBagMenu::open);
-
         // 帮助 / 说明按钮
         inv.setStack(45, helpButton());
         actions.put(45, HelpMenu::open);
@@ -286,10 +278,10 @@ public final class MenuUi {
     }
 
     private static ItemStack kitButton(ServerPlayerEntity player) {
-        boolean claimed = KitTracker.hasClaimed(player.getUuid());
+        long left = KitTracker.remainingCooldown(player.getUuid());
         List<String> lore = List.of(
-            claimed ? "§7首次领取 §a已完成" : "§7首次领取 §e未领取",
-            "§7菜单入口可反复领取",
+            left > 0 ? "§7冷却中 §c" + KitTracker.formatRemaining(left) : "§7状态 §a可领取",
+            "§7每 24 小时可领取一次",
             "",
             "§a▶ 点击领取一套"
         );
@@ -417,11 +409,7 @@ public final class MenuUi {
     }
 
     private static void giveKit(ServerPlayerEntity player) {
-        KitCommand.giveKitItems(player);
-        if (!KitTracker.hasClaimed(player.getUuid())) {
-            KitTracker.markClaimed(player.getUuid());
-        }
-        player.sendMessage(Text.literal("已领取 Kit！").formatted(Formatting.GREEN), true);
+        KitCommand.tryClaim(player, true);
         player.closeHandledScreen();
     }
 

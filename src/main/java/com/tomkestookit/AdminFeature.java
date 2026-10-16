@@ -66,10 +66,10 @@ public final class AdminFeature {
         add("recipe.infinite_bucket",    "无限水/岩浆桶配方",Items.LAVA_BUCKET,   Group.RECIPE, "V字形：水/岩浆桶 + 炼药锅 + 3 铁块 → 无限桶");
         add("recipe.logistics",          "物流终端配方",     Items.LODESTONE,     Group.RECIPE, "8 铁块 + 中心磁石 → 一对物流桶");
         add("recipe.auto_crafter",       "自动合成器配方",   Items.CRAFTING_TABLE,Group.RECIPE, "中心工作台 + 4 铁 + 4 红石 → 自动合成器");
-        add("recipe.trinket",            "饰品配方",         Items.ENDER_EYE,    Group.RECIPE, "8 种饰品的 3×3 合成");
+        add("recipe.antigrav_boots",     "反重力皮靴配方",   Items.PHANTOM_MEMBRANE, Group.RECIPE, "中心皮靴 + 8 幻翼膜 → 反重力皮靴");
 
         // ---------- 物品交互 ----------
-        add("item.antigrav_boots",       "反重力靴",         Items.LEATHER_BOOTS, Group.ITEM, "跳跃 II、摔落减伤 75%、速度 ×3、铁砧转移");
+        add("item.antigrav_boots",       "反重力靴",         Items.LEATHER_BOOTS, Group.ITEM, "跳跃 II、摔落减伤 75%、速度 ×3");
         add("item.sugar_tnt_boom",       "大伊万爆炸增强",   Items.TNT,           Group.ITEM, "关闭后已合成的大伊万走 vanilla 威力");
         add("item.thrown_explosive",     "手雷 / 蹦蹦炸弹",  Items.FIRE_CHARGE,   Group.ITEM, "右键抛出，爆炸只造成伤害不破坏方块");
         add("item.region_clearer_use",   "区域清除斧使用",   Items.NETHERITE_AXE, Group.ITEM, "左右键选点、聊天确认后分批清除");
@@ -83,8 +83,7 @@ public final class AdminFeature {
         add("item.sign_command",         "告示牌绑命令",     Items.OAK_SIGN,      Group.ITEM, "shift+F 手持告示牌 → 聊天输入命令 → 放下即封");
         add("item.veinmine",             "连锁采集",         Items.DIAMOND_PICKAXE,Group.ITEM,"shift+挖 → BFS 连锁，补树苗");
         add("item.entity_capture",       "生物收纳",         Items.EGG,           Group.ITEM, "shift+右键生物装进对应刷怪蛋");
-        add("item.trinket",             "饰品系统",         Items.ENDER_EYE,     Group.ITEM, "27 格饰品袋 + 被动效果 + 菜单入口");
-        add("item.reforge",             "重铸石系统",       Items.ANVIL,         Group.ITEM, "铁砧 + 重铸石给装备追加属性");
+        add("item.reforge",             "重铸石系统",       Items.ANVIL,         Group.ITEM, "经验汲取：铁砧敲装备，损坏时消耗经验自动修复");
         // item.boss_token Boss 召唤系统已取消
         add("item.original_weapon",     "原创武器",         Items.NETHERITE_SWORD, Group.ITEM, "血月镰刀 / 灵魂收割者 / 深渊三叉戟 / 虚空之刃合成 + 特效");
 
